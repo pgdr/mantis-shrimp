@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use std::backtrace::Backtrace;
+// use std::backtrace::Backtrace;
 use std::collections::BTreeSet;
 use std::default;
 
@@ -42,17 +42,37 @@ impl NQuery {
     fn is_shattered(&self, S: &BTreeSet<Vertex>) -> bool {
         let mut I:FxHashMap<_, _> = FxHashMap::default();
 
-        for subset in S.iter().powerset(){ 
+        for subset in S.iter().powerset() { 
             let subset: BTreeSet<_> = subset.into_iter().cloned().collect();
             let res = self.query_uncor(&subset, S);
             I.insert(subset, res);
         }
 
-        let left_neighs = self.left_neighbour_set(S);
+        // correction
+        let left_neighs = self.left_neighbour_set(S); 
 
-        for neigh in left_neighs {
-            // apply correction
+        for v in left_neighs {
+            let mut neigh: BTreeSet<Vertex> = self.graph.neighbours(&v).cloned().collect();
+            let mut v_left_neigh: BTreeSet<Vertex> = self.graph.left_neighbours(&v).into_iter().collect();
+            let mut v_right_neigh: BTreeSet<Vertex> = neigh.difference(&v_left_neigh).cloned().collect();
+
+            // if v_right_neigh in I.keys() and v_left_neigh not in I.keys():
+            let subsets: BTreeSet<_> = I.keys().cloned().collect();
+
+            if subsets.contains(&v_right_neigh) {
+                if subsets.contains(&v_left_neigh) {
+
+                    let new_subset: BTreeSet<_> = v_left_neigh.union(&v_right_neigh).cloned().collect();
+                    I.entry(v_left_neigh).and_modify(|c| *c -= 1);
+                    I.entry(new_subset).and_modify(|c| *c += 1);
+
+                } else {
+                    I.entry(v_right_neigh).and_modify(|c| *c += 1);
+                }
+            }
+            // now to check
         }
+        true
     }
 
     fn query_uncor(&self, X: &BTreeSet<Vertex>, S: &BTreeSet<Vertex>) -> i32 {
@@ -69,7 +89,6 @@ impl NQuery {
                 res -= *self.R.get(&Y).unwrap_or(&0) as i32;
             }
         }
-        // to do: add correction.
         res
     }
 
