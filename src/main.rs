@@ -51,17 +51,38 @@ impl NQuery {
         // correction
         let left_neighs = self.left_neighbour_set(S); 
 
-        for v in left_neighs {
+        for v in left_neighs {    
             let mut neigh: BTreeSet<Vertex> = self.graph.neighbours(&v).cloned().collect();
             let mut v_left_neigh: BTreeSet<Vertex> = self.graph.left_neighbours(&v).into_iter().collect();
             let mut v_right_neigh: BTreeSet<Vertex> = neigh.difference(&v_left_neigh).cloned().collect();
 
             // if v_right_neigh in I.keys() and v_left_neigh not in I.keys():
+
+            /*
+                Felix: 
+                This line should make you suspicious: we are not modifying the key set of `I` at all, 
+                so why should we need a copy? The issue here is that .keys() gives us an iterator to the
+                keys, it is the wrong approach here.
+
+                Have a look at `I.contains_key` instead.
+            */
             let subsets: BTreeSet<_> = I.keys().cloned().collect();
 
+            /*
+                Felix:
+                Patrick, have a look at the paper write-up of the correction. What we need is 
+                not the left/right neighbourhood of v, but the *intersections* of the left/right neighbourhood
+                with S. 
+
+                The only special case you should need to check here is if $N^-(v) \cap S$ is empty, because that
+                entry will not exist (and we don't really need it). The entry-api allows you to insert a value if none
+                exists, e.g.
+                    I.entry(X).and_modify(|c| *c += 1 ).or_insert(1)
+                Will either modify and existing value for the key `X` by incrementing it by one or insert a new value
+                for it (here 1).
+            */
             if subsets.contains(&v_right_neigh) {
                 if subsets.contains(&v_left_neigh) {
-
                     let new_subset: BTreeSet<_> = v_left_neigh.union(&v_right_neigh).cloned().collect();
                     I.entry(v_left_neigh).and_modify(|c| *c -= 1);
                     I.entry(new_subset).and_modify(|c| *c += 1);
