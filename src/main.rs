@@ -51,12 +51,23 @@ impl NQuery {
         // correction
         let left_neighs = self.left_neighbour_set(S); 
 
-        for v in left_neighs {    
-            let mut neigh: BTreeSet<Vertex> = self.graph.neighbours(&v).cloned().collect();
-            let mut v_left_neigh: BTreeSet<Vertex> = self.graph.left_neighbours(&v).into_iter().collect();
-            let mut v_right_neigh: BTreeSet<Vertex> = neigh.difference(&v_left_neigh).cloned().collect();
+        for v in left_neighs {   
+            // collect v's left and right neighbourhoods 
+            let neigh: BTreeSet<Vertex> = self.graph.neighbours(&v).cloned().collect();
+            let v_left_neigh: BTreeSet<Vertex> = self.graph.left_neighbours(&v).into_iter().collect();
+            let v_right_neigh: BTreeSet<Vertex> = neigh.difference(&v_left_neigh).cloned().collect();
+            
+            // take the intersections of the neighbourhoods with S
+            let v_left_S: BTreeSet<Vertex> = S.intersection(&v_left_neigh).cloned().collect();
+            let v_right_S: BTreeSet<Vertex> = S.intersection(&v_right_neigh).cloned().collect();
 
-            // if v_right_neigh in I.keys() and v_left_neigh not in I.keys():
+            if v_left_S.is_empty() {
+                I.entry(v_right_S).and_modify(|c| *c += 1 ).or_insert(1);
+            } else {
+                let v_S: BTreeSet<Vertex> = v_left_S.union(&v_right_S).cloned().collect();
+                I.entry(v_left_S).and_modify(|c| *c -= 1 ).or_insert(1);
+                I.entry(v_S).and_modify(|c| *c += 1 ).or_insert(1);
+            }
 
             /*
                 Felix: 
@@ -66,7 +77,7 @@ impl NQuery {
 
                 Have a look at `I.contains_key` instead.
             */
-            let subsets: BTreeSet<_> = I.keys().cloned().collect();
+            // let subsets: BTreeSet<_> = I.keys().cloned().collect();
 
             /*
                 Felix:
@@ -80,7 +91,7 @@ impl NQuery {
                     I.entry(X).and_modify(|c| *c += 1 ).or_insert(1)
                 Will either modify and existing value for the key `X` by incrementing it by one or insert a new value
                 for it (here 1).
-            */
+
             if subsets.contains(&v_right_neigh) {
                 if subsets.contains(&v_left_neigh) {
                     let new_subset: BTreeSet<_> = v_left_neigh.union(&v_right_neigh).cloned().collect();
@@ -90,9 +101,9 @@ impl NQuery {
                 } else {
                     I.entry(v_right_neigh).and_modify(|c| *c += 1);
                 }
+                */
             }
             // now to check
-        }
         true
     }
 
