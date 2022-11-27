@@ -1,21 +1,19 @@
 #![allow(non_snake_case)]
 // use std::backtrace::Backtrace;
 use std::collections::BTreeSet;
-use std::default;
 
 use graphbench::editgraph::EditGraph;
 use graphbench::graph::*;
-use graphbench::io::*;
 
 use graphbench::degengraph::*;
 use itertools::*;
 
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 
 fn main() {
     let mut graph = EditGraph::from_gzipped("Yeast.txt.gz").expect("File not found");   
     graph.remove_loops();
-    let nquery = NQuery::new(&graph);
+    // let nquery = NQuery::new(&graph);
 
 }
 
@@ -37,6 +35,36 @@ impl NQuery {
             }
         }
         NQuery { R, graph }
+    }
+
+    fn query_uncor(&self, X: &BTreeSet<Vertex>, S: &BTreeSet<Vertex>) -> i32 {
+        if X.is_empty() {
+            return 0
+        }
+        let S_minus_X:BTreeSet<_> = S.difference(&X).collect();
+        let mut res:i32 = 0;
+
+        for subset in S_minus_X.into_iter().powerset() {
+            let subset: BTreeSet<u32> = subset.into_iter().cloned().collect();
+            let Y:BTreeSet<u32> = X.union(&subset).cloned().collect();
+
+            if subset.len() % 2 == 0 {
+                res += *self.R.get(&Y).unwrap_or(&0) as i32;
+            } else {
+                res -= *self.R.get(&Y).unwrap_or(&0) as i32;
+            }
+        }
+        res
+    }
+
+    fn left_neighbour_set(&self, S: &BTreeSet<Vertex>) -> BTreeSet<Vertex> {
+        let mut res: BTreeSet<Vertex> = BTreeSet::default();
+
+        for u in S {
+            let l_neigh = self.graph.left_neighbours(u);
+            res.extend(l_neigh.into_iter())
+        }
+        res  
     }
 
     fn is_shattered(&self, S: &BTreeSet<Vertex>) -> bool {
@@ -73,41 +101,41 @@ impl NQuery {
             return false
         }
 
-        for (k, v) in I.iter() {
+        for (_k, v) in I.iter() {
             if *v == 0 {
                 return false
             }
         }
         return true
     }
+}
 
-    fn query_uncor(&self, X: &BTreeSet<Vertex>, S: &BTreeSet<Vertex>) -> i32 {
-        if X.is_empty() {
-            return 0
-        }
-        let S_minus_X:BTreeSet<_> = S.difference(&X).collect();
-        let mut res:i32 = 0;
 
-        for subset in S_minus_X.into_iter().powerset() {
-            let subset: BTreeSet<u32> = subset.into_iter().cloned().collect();
-            let Y:BTreeSet<u32> = X.union(&subset).cloned().collect();
+#[cfg(test)]
+mod  tests {
+    use graphbench::{editgraph::EditGraph, graph::MutableGraph};
+    use crate::NQuery;
+    use std::collections::BTreeSet;
 
-            if subset.len() % 2 == 0 {
-                res += *self.R.get(&Y).unwrap_or(&0) as i32;
-            } else {
-                res -= *self.R.get(&Y).unwrap_or(&0) as i32;
-            }
-        }
-        res
+    #[test]
+    fn shattered_test1 () {
+        let mut graph = EditGraph::from_txt("test1_shattered.txt").expect("File not found.");
+        graph.remove_loops();
+        let nquery = NQuery::new(&graph);
+
+        let sh_set = BTreeSet::from([1, 2, 3, 4]);
+        let result = nquery.is_shattered(&sh_set);
+        assert_eq!(result, true);
     }
 
-    fn left_neighbour_set(&self, S: &BTreeSet<Vertex>) -> BTreeSet<Vertex> {
-        let mut res: BTreeSet<Vertex> = BTreeSet::default();
+    #[test]
+    fn shattered_test2 () {
+        let mut graph = EditGraph::from_txt("test1_shattered.txt").expect("File not found.");
+        graph.remove_loops();
+        let nquery = NQuery::new(&graph);
 
-        for u in S {
-            let l_neigh = self.graph.left_neighbours(u);
-            res.extend(l_neigh.into_iter())
-        }
-        res  
+        let unsh_set = BTreeSet::from([1, 2, 3, 16]);
+        let result = nquery.is_shattered(&unsh_set);
+        assert_eq!(result, false);
     }
 }
