@@ -52,6 +52,9 @@ fn main() -> Result<(), &'static str> {
 
     let d = *nquery.graph.left_degrees().values().max().unwrap();
     let p = ((d as f64).log2() + 1.0).floor() as u32;
+
+    println!("Degeneracy is d={d}");
+    println!("Threshold is p={p}");
     
     /*
         Idea: Use bloom filter to store the k-sized shattered sets, then
