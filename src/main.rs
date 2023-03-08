@@ -4,6 +4,7 @@ mod io;
 
 // use std::backtrace::Backtrace;
 use std::collections::BTreeSet;
+use std::default;
 use io::load_graph;
 
 use graphbench::editgraph::EditGraph;
@@ -48,38 +49,113 @@ fn main() -> Result<(), &'static str> {
 
     // let mut graph = EditGraph::from_gzipped("Yeast.txt.gz").expect("File not found");   
     graph.remove_loops();
-    let nquery = NQuery::new(&graph);
+    let n = graph.num_vertices();
+    let nquery = NQuery::new(graph);
 
     let d = *nquery.graph.left_degrees().values().max().unwrap();
-    let p = ((d as f64).log2() + 1.0).floor() as u32;
+    let logd = (d as f32).log2();
 
     println!("Degeneracy is d={d}");
-    println!("Threshold is p={p}");
     
-    /*
-        Idea: Use bloom filter to store the k-sized shattered sets, then
-        query to figure out whether a given (k+1)-sized set could be shattered
-    */
+    // Phase 1: Linear scan
+    let mut largest_set:BTreeSet<Vertex> = BTreeSet::default();
+    let mut largest_local:VertexMap<usize> = VertexMap::default();
 
-    // Case 2 in paper: Shattered set is small
-    let vertices:Vec<_> = graph.vertices().collect();
-    for r in 3..=p { 
-        println!("Searching sets of size r={r}");
-        for S in vertices.iter().combinations(r as usize) {
-            let S:BTreeSet<Vertex> = S.into_iter().cloned().cloned().collect();
-            if nquery.is_shattered(&S) {
-                println!("  Found shattered set for r={r}: {S:?}");
-                break;
+    for &v in nquery.graph.vertices() {
+        let mut N = nquery.graph.left_neighbours(&v);
+        N.push(v);
+
+        let mut best_local:BTreeSet<Vertex> = BTreeSet::default();    
+        let mut current_size:usize = 0;    
+        for S in N.iter().powerset() {
+            if S.len() > current_size {
+                // We are going up in subset size
+                if best_local.len() < current_size {
+                    break; // No use continuing
+                }
+                assert_eq!(current_size+1, S.len());
+                current_size = S.len();
             }
-        } 
+
+            if best_local.len() == current_size {
+                continue;
+            }            
+
+            let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
+            if nquery.is_shattered(&S) {
+                assert!(S.len() > best_local.len());
+                best_local = S;
+            }
+        }
+
+        largest_local.entry(v)
+            .and_modify(|e| *e = std::cmp::max(best_local.len(), *e))
+            .or_insert(best_local.len());
+
+        if best_local.len() > largest_set.len() {
+            largest_set = best_local;
+        }    
     }
 
-    // Case 1 in paper: Shattered set is large
-    for r in (p+1)..(d+1) {
-        // TODO
+    println!("Largest one-covered shattered set: {:?}", largest_set);
+
+    // Check which vertices are valid candidates for a shattered set 
+    // of size k
+    let mut k = largest_set.len() + 1;
+    let degree_profile = generate_degree_profile(k);
+    println!("{degree_profile:?}");
+
+    let mut num_candidates = 0;
+    for &v in nquery.graph.vertices() {
+        let mut degrees = Vec::default();
+        for u in nquery.graph.neighbours(&v) {
+            degrees.push(nquery.graph.degree(u) as usize);
+        }
+        degrees.sort_unstable();
+        degrees.reverse();
+
+        if dominates_profile(&degrees, &degree_profile) {
+            println!("{degrees:?}");
+            num_candidates += 1;
+        }
     }
 
+    println!("Found {num_candidates} out of {n} as candidates for {k}-shattered set");
+
+    // Look for chunks of size k / log d
     Ok(())
+}
+
+fn binom(n: usize, k: usize) -> usize {
+    let mut res = 1;
+    for i in 0..k {
+        res = (res * (n - i)) / (i + 1);
+    }
+    res
+}
+
+fn generate_degree_profile(k:usize) -> Vec<usize> {
+    let mut res = Vec::default();
+    for d in (1..=k).rev() {
+        for _ in 0..binom(k, d) {
+            res.push(d);
+        }
+    }
+    res
+}
+
+fn dominates_profile(degA:&Vec<usize>, degB:&Vec<usize>) -> bool {
+    if degA.len() < degB.len() {
+        return false;
+    }
+
+    for (dA,dB) in degA.iter().zip(degB.iter()) {
+        if dA < dB {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 struct NQuery {
@@ -88,8 +164,8 @@ struct NQuery {
 }
 
 impl NQuery {
-    fn new(graph: &EditGraph) -> Self {
-        let graph = DegenGraph::from_graph(graph);    
+    fn new(graph:EditGraph) -> Self {
+        let graph = DegenGraph::from_graph(&graph);    
         let mut R:FxHashMap<_, _> = FxHashMap::default();
 
         for u in graph.vertices() {
