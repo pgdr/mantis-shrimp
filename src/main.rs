@@ -49,16 +49,17 @@ fn main() -> Result<(), &'static str> {
     };
 
     println!("Loaded graph with n={} and m={}", graph.num_vertices(), graph.num_edges());
+    
+    graph.remove_loops();
+    let graph = DegenGraph::from_graph(&graph);  
+
+    let d = *graph.left_degrees().values().max().unwrap() as usize;
+    let logd = (d as f32).log2();    
+    println!("Computed degeneracy ordering with d={} (log d = {:.2})", d, logd);
 
     // let mut graph = EditGraph::from_gzipped("Yeast.txt.gz").expect("File not found");   
-    graph.remove_loops();
     let n = graph.num_vertices();
-    let mut nquery = NQuery::new(graph);
-
-    let d = *nquery.graph.left_degrees().values().max().unwrap() as usize;
-    let logd = (d as f32).log2();
-
-    println!("Degeneracy is d={d}");
+    let mut nquery = NQuery::new(&graph);
     
     // Phase 1: Linear scan
     let mut k = 2;
@@ -153,15 +154,14 @@ fn dominates_profile(degA:&Vec<usize>, degB:&Vec<usize>) -> bool {
     return true;
 }
 
-struct NQuery {
+struct NQuery<'a> {
     R:FxHashMap<BTreeSet<Vertex>, u32>,
     max_query_size: usize,
-    graph:DegenGraph
+    graph:&'a DegenGraph
 }
 
-impl NQuery {
-    fn new(graph:EditGraph) -> Self {
-        let graph = DegenGraph::from_graph(&graph);    
+impl<'a> NQuery<'a> {
+    fn new(graph:&'a DegenGraph) -> Self {  
         let mut R:FxHashMap<_, _> = FxHashMap::default();
 
         let mut res = NQuery { R, graph, max_query_size: 0 };
