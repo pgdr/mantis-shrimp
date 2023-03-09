@@ -53,72 +53,48 @@ fn main() -> Result<(), &'static str> {
     // let mut graph = EditGraph::from_gzipped("Yeast.txt.gz").expect("File not found");   
     graph.remove_loops();
     let n = graph.num_vertices();
-    let nquery = NQuery::new(graph);
+    let mut nquery = NQuery::new(graph);
 
-    let d = *nquery.graph.left_degrees().values().max().unwrap();
+    let d = *nquery.graph.left_degrees().values().max().unwrap() as usize;
     let logd = (d as f32).log2();
 
     println!("Degeneracy is d={d}");
     
     // Phase 1: Linear scan
-    let mut largest_set:BTreeSet<Vertex> = BTreeSet::default();
-    let mut largest_local:VertexMap<usize> = VertexMap::default();
+    let mut k = 2;
 
-    for &v in nquery.graph.vertices() {
-        let mut N = nquery.graph.left_neighbours(&v);
-        N.push(v);
+    let order:Vec<_> = nquery.graph.vertices().cloned().collect();
 
-        let mut best_local:BTreeSet<Vertex> = BTreeSet::default();    
-        let mut current_size:usize = 0;    
-        for S in N.iter().powerset() {
-            if S.len() > current_size {
-                // We are going up in subset size
-                if best_local.len() < current_size {
-                    break; // No use continuing
+    let mut improved = true;
+    while improved && k+1 <= d {
+        improved = false;
+        for &v in &order {
+            let mut N = nquery.graph.left_neighbours(&v);
+            N.push(v);
+
+            for S in N.iter().combinations(k+1) {
+                let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
+                if nquery.is_shattered(&S) {
+                    k = k + 1;
+                    println!("Found shattered set of size {k}");                    
+                    improved = true;
+                    break;
                 }
-                assert_eq!(current_size+1, S.len());
-                current_size = S.len();
-            }
-
-            if best_local.len() == current_size {
-                continue;
-            }            
-
-            let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
-            if nquery.is_shattered(&S) {
-                assert!(S.len() > best_local.len());
-                best_local = S;
             }
         }
-
-        largest_local.entry(v)
-            .and_modify(|e| *e = std::cmp::max(best_local.len(), *e))
-            .or_insert(best_local.len());
-
-        if best_local.len() > largest_set.len() {
-            largest_set = best_local;
-        }    
     }
 
-    println!("Largest one-covered shattered set: {:?}", largest_set);
+    println!("Largest one-covered shattered set: {:?}", k);
 
     // Check which vertices are valid candidates for a shattered set 
     // of size k
-    let mut k = largest_set.len() + 1;
-    let degree_profile = generate_degree_profile(k);
+    let degree_profile = generate_degree_profile(k+1);
     // println!("{degree_profile:?}");
 
     let mut witness_candidates:VertexSet = VertexSet::default();
     for &v in nquery.graph.vertices() {
-        let mut degrees = Vec::default();
-        for u in nquery.graph.neighbours(&v) {
-            degrees.push(nquery.graph.degree(u) as usize);
-        }
-        degrees.sort_unstable();
-        degrees.reverse();
-
+        let degrees = nquery.degree_profile(&v);
         if dominates_profile(&degrees, &degree_profile) {
-            // println!("{degrees:?}");
             witness_candidates.insert(v);
         }
     }
@@ -179,6 +155,7 @@ fn dominates_profile(degA:&Vec<usize>, degB:&Vec<usize>) -> bool {
 
 struct NQuery {
     R:FxHashMap<BTreeSet<Vertex>, u32>,
+    max_query_size: usize,
     graph:DegenGraph
 }
 
@@ -187,20 +164,17 @@ impl NQuery {
         let graph = DegenGraph::from_graph(&graph);    
         let mut R:FxHashMap<_, _> = FxHashMap::default();
 
-        for u in graph.vertices() {
-            let N = graph.left_neighbours(u);
+        let mut res = NQuery { R, graph, max_query_size: 0 };
+        res.ensure_size(3);
 
-            for subset in N.into_iter().powerset() {
-                R.entry(subset.into_iter().collect()).and_modify(|c| *c += 1).or_insert(1);
-            }
-        }
-        NQuery { R, graph }
+        res        
     }
 
     fn query_uncor(&self, X: &BTreeSet<Vertex>, S: &BTreeSet<Vertex>) -> i32 {
         if X.is_empty() {
             return 0
         }
+
         let S_minus_X:BTreeSet<_> = S.difference(&X).collect();
         let mut res:i32 = 0;
 
@@ -227,9 +201,31 @@ impl NQuery {
         res  
     }
 
-    fn is_shattered(&self, S: &BTreeSet<Vertex>) -> bool {
+    fn ensure_size(&mut self, size:usize) {
+        if size <= self.max_query_size {
+            return;
+        }
+
+        println!("Recomputing R for query size {size}...");
+
+        for s in (self.max_query_size+1)..=size {
+            for u in self.graph.vertices() {
+                let N = self.graph.left_neighbours(u);
+    
+                for subset in N.into_iter().combinations(s) {
+                    self.R.entry(subset.into_iter().collect()).and_modify(|c| *c += 1).or_insert(1);
+                }
+            }
+        }
+
+        self.max_query_size = size;
+    }
+
+    fn is_shattered(&mut self, S: &BTreeSet<Vertex>) -> bool {
         let mut I:FxHashMap<_, _> = FxHashMap::default();
         
+        self.ensure_size(S.len());
+
         let mut res_sum = 0;
         for subset in S.iter().powerset() { 
             let subset: BTreeSet<_> = subset.into_iter().cloned().collect();
@@ -268,6 +264,16 @@ impl NQuery {
         }
         return true
     }
+
+    fn degree_profile(&self, v:&Vertex) -> Vec<usize> {
+        let mut degrees = Vec::default();
+        for u in self.graph.neighbours(&v) {
+            degrees.push(self.graph.degree(u) as usize);
+        }
+        degrees.sort_unstable();
+        degrees.reverse();
+        degrees
+    }
 }
 
 
@@ -281,7 +287,7 @@ mod  tests {
     fn shattered_test1 () {
         let mut graph = EditGraph::from_txt("test1_shattered.txt").expect("File not found.");
         graph.remove_loops();
-        let nquery = NQuery::new(&graph);
+        let mut nquery = NQuery::new(graph);
 
         let sh_set = BTreeSet::from([1, 2, 3, 4]);
         let result = nquery.is_shattered(&sh_set);
@@ -292,7 +298,7 @@ mod  tests {
     fn shattered_test2 () {
         let mut graph = EditGraph::from_txt("test1_shattered.txt").expect("File not found.");
         graph.remove_loops();
-        let nquery = NQuery::new(&graph);
+        let mut nquery = NQuery::new(graph);
 
         let unsh_set = BTreeSet::from([1, 2, 3, 16]);
         let result = nquery.is_shattered(&unsh_set);
