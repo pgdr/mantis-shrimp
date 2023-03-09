@@ -1,4 +1,7 @@
 #![allow(non_snake_case)]
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(unused_imports)]
 
 mod io;
 
@@ -103,9 +106,9 @@ fn main() -> Result<(), &'static str> {
     // of size k
     let mut k = largest_set.len() + 1;
     let degree_profile = generate_degree_profile(k);
-    println!("{degree_profile:?}");
+    // println!("{degree_profile:?}");
 
-    let mut num_candidates = 0;
+    let mut witness_candidates:VertexSet = VertexSet::default();
     for &v in nquery.graph.vertices() {
         let mut degrees = Vec::default();
         for u in nquery.graph.neighbours(&v) {
@@ -115,12 +118,28 @@ fn main() -> Result<(), &'static str> {
         degrees.reverse();
 
         if dominates_profile(&degrees, &degree_profile) {
-            println!("{degrees:?}");
-            num_candidates += 1;
+            // println!("{degrees:?}");
+            witness_candidates.insert(v);
         }
     }
 
-    println!("Found {num_candidates} out of {n} as candidates for {k}-shattered set");
+    println!("Found {} out of {n} as witness candidates for {k}-shattered set", witness_candidates.len());
+
+    let mut cover_candidates:VertexSet = witness_candidates.iter().cloned().collect(); 
+    for &v in nquery.graph.vertices() {
+        let mut covers = false;
+        for u in nquery.graph.left_neighbours_slice(&v) {
+            if witness_candidates.contains(u) {
+                covers = true;
+                break;
+            }
+        }
+        if covers {
+            cover_candidates.insert(v);
+        }
+    }
+
+    println!("Found {} out of {n} as cover candidates for {k}-shattered set", cover_candidates.len());
 
     // Look for chunks of size k / log d
     Ok(())
