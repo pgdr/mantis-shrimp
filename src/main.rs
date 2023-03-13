@@ -5,12 +5,14 @@
 
 mod io;
 mod nquery;
+mod algorithms;
 
 // use std::backtrace::Backtrace;
 use std::collections::BTreeSet;
 use std::default;
 use io::load_graph;
 use nquery::*;
+use algorithms::*;
 
 use graphbench::editgraph::EditGraph;
 use graphbench::graph::*;
@@ -61,99 +63,72 @@ fn main() -> Result<(), &'static str> {
     let logd = (d as f32).log2();    
     println!("Computed degeneracy ordering with d={} (log d = {:.2})", d, logd);
 
+
+    let mut alg = VCAlgorithm::new(&graph);
+    alg.run();
+
+
     // let mut graph = EditGraph::from_gzipped("Yeast.txt.gz").expect("File not found");   
-    let n = graph.num_vertices();
-    let mut nquery = NQuery::new(&graph);
+    // let n = graph.num_vertices();
+    // let mut nquery = NQuery::new(&graph);
     
     // Phase 1: Linear scan
-    let mut k = 2;
+    // let mut k = 2;
 
-    let order:Vec<_> = graph.vertices().cloned().collect();
+    // let order:Vec<_> = graph.vertices().cloned().collect();
 
-    let mut improved = true;
-    while improved && k+1 <= d {
-        improved = false;
-        for &v in &order {
-            let mut N = graph.left_neighbours(&v);
-            N.push(v);
+    // let mut improved = true;
+    // while improved && k+1 <= d {
+    //     improved = false;
+    //     for &v in &order {
+    //         let mut N = graph.left_neighbours(&v);
+    //         N.push(v);
 
-            for S in N.iter().combinations(k+1) {
-                let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
-                if nquery.is_shattered(&S) {
-                    k = k + 1;
-                    println!("Found shattered set of size {k}");                    
-                    improved = true;
-                    break;
-                }
-            }
-        }
-    }
+    //         for S in N.iter().combinations(k+1) {
+    //             let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
+    //             if nquery.is_shattered(&S) {
+    //                 k = k + 1;
+    //                 println!("Found shattered set of size {k}");                    
+    //                 improved = true;
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
 
-    println!("Largest one-covered shattered set: {:?}", k);
+    // println!("Largest one-covered shattered set: {:?}", k);
 
     // Check which vertices are valid candidates for a shattered set 
     // of size k
-    let degree_profile = generate_degree_profile(k+1);
+    // let degree_profile = generate_degree_profile(k+1);
     // println!("{degree_profile:?}");
 
-    let mut witness_candidates:VertexSet = VertexSet::default();
-    for &v in graph.vertices() {
-        let degrees = nquery.degree_profile(&v);
-        if dominates_profile(&degrees, &degree_profile) {
-            witness_candidates.insert(v);
-        }
-    }
+    // let mut witness_candidates:VertexSet = VertexSet::default();
+    // for &v in graph.vertices() {
+    //     let degrees = nquery.degree_profile(&v);
+    //     if dominates_profile(&degrees, &degree_profile) {
+    //         witness_candidates.insert(v);
+    //     }
+    // }
 
-    println!("Found {} out of {n} as witness candidates for {k}-shattered set", witness_candidates.len());
+    // println!("Found {} out of {n} as witness candidates for {k}-shattered set", witness_candidates.len());
 
-    let mut cover_candidates:VertexSet = witness_candidates.iter().cloned().collect(); 
-    for &v in graph.vertices() {
-        let mut covers = false;
-        for u in graph.left_neighbours_slice(&v) {
-            if witness_candidates.contains(u) {
-                covers = true;
-                break;
-            }
-        }
-        if covers {
-            cover_candidates.insert(v);
-        }
-    }
+    // let mut cover_candidates:VertexSet = witness_candidates.iter().cloned().collect(); 
+    // for &v in graph.vertices() {
+    //     let mut covers = false;
+    //     for u in graph.left_neighbours_slice(&v) {
+    //         if witness_candidates.contains(u) {
+    //             covers = true;
+    //             break;
+    //         }
+    //     }
+    //     if covers {
+    //         cover_candidates.insert(v);
+    //     }
+    // }
 
-    println!("Found {} out of {n} as cover candidates for {k}-shattered set", cover_candidates.len());
+    // println!("Found {} out of {n} as cover candidates for {k}-shattered set", cover_candidates.len());
 
     // Look for chunks of size k / log d
     Ok(())
-}
-
-fn binom(n: usize, k: usize) -> usize {
-    let mut res = 1;
-    for i in 0..k {
-        res = (res * (n - i)) / (i + 1);
-    }
-    res
-}
-
-fn generate_degree_profile(k:usize) -> Vec<usize> {
-    let mut res = Vec::default();
-    for d in (1..=k).rev() {
-        for _ in 0..binom(k, d) {
-            res.push(d);
-        }
-    }
-    res
-}
-
-fn dominates_profile(degA:&Vec<usize>, degB:&Vec<usize>) -> bool {
-    if degA.len() < degB.len() {
-        return false;
-    }
-
-    for (dA,dB) in degA.iter().zip(degB.iter()) {
-        if dA < dB {
-            return false;
-        }
-    }
-
-    return true;
 }
