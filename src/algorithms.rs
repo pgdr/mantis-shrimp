@@ -63,49 +63,94 @@ impl<'a> VCAlgorithm<'a> {
 
     pub fn run(&mut self) {
         let mut improved = true;
-        while improved && self.vc_dim+1 <= self.d {
+        let mut cover_size = 1;
+        while improved && self.vc_dim <= self.d+1 {
             improved = false;
-            println!("Checking {} candidates", self.cover_candidates.len() );
-            for &v in &self.cover_candidates {
-                let mut N = self.graph.left_neighbours(&v);
-                N.push(v);
 
-                for S in N.iter().combinations(self.vc_dim+1) {
+            let brute_force_estimate = binom(self.witness_candidates.len(), self.vc_dim+1);
+            let cover_estimate = binom(self.cover_candidates.len(), cover_size) * binom(cover_size * self.d, self.vc_dim+1);
+
+            if brute_force_estimate < cover_estimate {
+                println!("Brute-force: ({} choose {}) candidates", self.witness_candidates.len(), self.vc_dim+1 );        
+                // Test each subset of size vc_dim+1 whether it is shattered
+                for S in self.witness_candidates.iter().combinations(self.vc_dim+1) {
                     let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
                     if self.nquery.is_shattered(&S) {
                         self.vc_dim += 1;
                         println!("Found shattered set of size {}", self.vc_dim);                    
                         improved = true;
                         break;
-                    }
+                    }                                            
                 }
 
-                if improved {
-                    break;
+                if !improved {
+                    break; // No further improvement possible
+                }
+            } else {
+                println!("Covering: ({} choose {}) candidates", self.cover_candidates.len(), cover_size );
+                for C in self.cover_candidates.iter().combinations(cover_size) {
+                    // Collect candidate set
+                    let mut N:VertexSet = C.iter().map(|u| **u).collect();
+                    for &u in &C {
+                        N.extend( self.graph.left_neighbours_slice(&u));
+                    }
+
+                    // Retain only those elements that are witness candidates
+                    N = N.iter().filter(|x| self.witness_candidates.contains(x) ).cloned().collect();
+
+                    if N.len() < self.vc_dim+1 {
+                        continue;
+                    }
+
+                    // Test each subset of size vc_dim+1 whether it is shattered
+                    // println!("  Checking ({} choose {}) subsets for cover {:?}", N.len(), self.vc_dim+1, C);
+                    for S in N.iter().combinations(self.vc_dim+1) {
+                        let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
+                        if self.nquery.is_shattered(&S) {
+                            self.vc_dim += 1;
+                            println!("Found shattered set of size {}", self.vc_dim);                    
+                            improved = true;
+                            break;
+                        }
+                    }
+
+                    // We immediately exit because and improvement lets us shrink the
+                    // candidate and the cover candidate set
+                    if improved {
+                        break;
+                    }
                 }
             }
 
-            println!("? {improved}");
             if improved {
+                println!("Found larger set, recomputing ");
                 self.recompute_candidates();
+
+                if self.witness_candidates.len() <= self.vc_dim {
+                    break;  // No further improvement possible
+                }
+            } else if cover_size < self.logd.ceil() as usize {
+                improved = true;
+                cover_size += 1;
+                println!("No improvement, increasing cover size to {cover_size}");
             }
         }
 
-        println!("Largest one-covered shattered set: {:?}", self.vc_dim);
+        println!("Largest shattered set: {:?}", self.vc_dim);
     }
 
     fn recompute_candidates(&mut self) {
-        println!("Recomputing candidates");
+        println!("  > Recomputing candidates");
         let degree_profile = generate_degree_profile(self.vc_dim+1);
         let n = self.graph.num_vertices();
-        println!("{degree_profile:?}");
+        println!("  > Degree profile is {degree_profile:?}");
 
         self.witness_candidates.retain(|v| {
             let degrees = self.nquery.degree_profile(&v);
             dominates_profile(&degrees, &degree_profile)
         });
 
-        println!("Found {} out of {n} as witness candidates for {}-shattered set", self.witness_candidates.len(), self.vc_dim);
+        println!("  > Found {} out of {n} as witness candidates for {}-shattered set", self.witness_candidates.len(), self.vc_dim);
 
         self.cover_candidates.retain(|v| {
             let mut covers = false;
@@ -118,7 +163,7 @@ impl<'a> VCAlgorithm<'a> {
             covers
         });
 
-        println!("Found {} out of {n} as cover candidates for {}-shattered set", self.cover_candidates.len(), self.vc_dim);
+        println!("  > Found {} out of {n} as cover candidates for {}-shattered set", self.cover_candidates.len(), self.vc_dim);
     }
 }   
 
