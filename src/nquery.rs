@@ -17,7 +17,6 @@ impl<'a> NQuery<'a> {
         let mut R:FxHashMap<_, _> = FxHashMap::default();
 
         let mut res = NQuery { R, graph, max_query_size: 0 };
-        res.ensure_size(3);
 
         res        
     }
@@ -53,7 +52,7 @@ impl<'a> NQuery<'a> {
         res  
     }
 
-    fn ensure_size(&mut self, size:usize) {
+    pub fn ensure_size(&mut self, size:usize, query_candidates:&VertexSet) {
         if size <= self.max_query_size {
             return;
         }
@@ -62,7 +61,8 @@ impl<'a> NQuery<'a> {
 
         for s in (self.max_query_size+1)..=size {
             for u in self.graph.vertices() {
-                let N = self.graph.left_neighbours(u);
+                let mut N = self.graph.left_neighbours(u);
+                N = N.iter().filter(|x| query_candidates.contains(x)).cloned().collect();
     
                 for subset in N.into_iter().combinations(s) {
                     self.R.entry(subset.into_iter().collect()).and_modify(|c| *c += 1).or_insert(1);
@@ -76,7 +76,7 @@ impl<'a> NQuery<'a> {
     pub fn is_shattered(&mut self, S: &BTreeSet<Vertex>) -> bool {
         let mut I:FxHashMap<_, _> = FxHashMap::default();
         
-        self.ensure_size(S.len());
+        assert!(S.len() <= self.max_query_size);
 
         let mut res_sum = 0;
         for subset in S.iter().powerset() { 

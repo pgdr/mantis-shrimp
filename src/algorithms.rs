@@ -42,7 +42,7 @@ fn dominates_profile(degA:&Vec<usize>, degB:&Vec<usize>) -> bool {
 pub struct VCAlgorithm<'a> {
     graph: &'a DegenGraph,
     nquery: NQuery<'a>,
-    witness_candidates:VertexSet,
+    shatter_candidates:VertexSet,
     cover_candidates:VertexSet,
     vc_dim:usize,
     d: usize,
@@ -54,26 +54,29 @@ impl<'a> VCAlgorithm<'a> {
         let d = *graph.left_degrees().values().max().unwrap() as usize;
         let logd = (d as f32).log2();    
 
-        let witness_candidates:VertexSet = graph.vertices().cloned().collect();
-        let mut cover_candidates:VertexSet = witness_candidates.iter().cloned().collect(); 
+        let shatter_candidates:VertexSet = graph.vertices().cloned().collect();
+        let mut cover_candidates:VertexSet = shatter_candidates.iter().cloned().collect(); 
 
         let mut nquery = NQuery::new(&graph);
-        VCAlgorithm{ graph, d, logd, witness_candidates, cover_candidates, nquery, vc_dim: 1}
+        VCAlgorithm{ graph, d, logd, shatter_candidates: shatter_candidates, cover_candidates, nquery, vc_dim: 1}
     }
 
     pub fn run(&mut self) {
         let mut improved = true;
         let mut cover_size = 1;
+
         while improved && self.vc_dim <= self.d+1 {
             improved = false;
 
-            let brute_force_estimate = binom(self.witness_candidates.len(), self.vc_dim+1);
+            let brute_force_estimate = binom(self.shatter_candidates.len(), self.vc_dim+1);
             let cover_estimate = binom(self.cover_candidates.len(), cover_size) * binom(cover_size * self.d, self.vc_dim+1);
 
+            self.nquery.ensure_size(self.vc_dim+1, &self.shatter_candidates);
+
             if brute_force_estimate < cover_estimate {
-                println!("Brute-force: ({} choose {}) candidates", self.witness_candidates.len(), self.vc_dim+1 );        
+                println!("Brute-force: ({} choose {}) candidates", self.shatter_candidates.len(), self.vc_dim+1 );        
                 // Test each subset of size vc_dim+1 whether it is shattered
-                for S in self.witness_candidates.iter().combinations(self.vc_dim+1) {
+                for S in self.shatter_candidates.iter().combinations(self.vc_dim+1) {
                     let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
                     if self.nquery.is_shattered(&S) {
                         self.vc_dim += 1;
@@ -88,7 +91,8 @@ impl<'a> VCAlgorithm<'a> {
                 }
             } else {
                 println!("Covering: ({} choose {}) candidates", self.cover_candidates.len(), cover_size );
-                for C in self.cover_candidates.iter().combinations(cover_size) {
+                
+                'outer: for C in self.cover_candidates.iter().combinations(cover_size) {
                     // Collect candidate set
                     let mut N:VertexSet = C.iter().map(|u| **u).collect();
                     for &u in &C {
@@ -96,7 +100,7 @@ impl<'a> VCAlgorithm<'a> {
                     }
 
                     // Retain only those elements that are witness candidates
-                    N = N.iter().filter(|x| self.witness_candidates.contains(x) ).cloned().collect();
+                    N = N.iter().filter(|x| self.shatter_candidates.contains(x) ).cloned().collect();
 
                     if N.len() < self.vc_dim+1 {
                         continue;
@@ -110,14 +114,8 @@ impl<'a> VCAlgorithm<'a> {
                             self.vc_dim += 1;
                             println!("Found shattered set of size {}", self.vc_dim);                    
                             improved = true;
-                            break;
+                            break 'outer;
                         }
-                    }
-
-                    // We immediately exit because and improvement lets us shrink the
-                    // candidate and the cover candidate set
-                    if improved {
-                        break;
                     }
                 }
             }
@@ -126,7 +124,7 @@ impl<'a> VCAlgorithm<'a> {
                 println!("Found larger set, recomputing ");
                 self.recompute_candidates();
 
-                if self.witness_candidates.len() <= self.vc_dim {
+                if self.shatter_candidates.len() <= self.vc_dim {
                     break;  // No further improvement possible
                 }
             } else if cover_size < self.logd.ceil() as usize {
@@ -145,17 +143,17 @@ impl<'a> VCAlgorithm<'a> {
         let n = self.graph.num_vertices();
         println!("  > Degree profile is {degree_profile:?}");
 
-        self.witness_candidates.retain(|v| {
+        self.shatter_candidates.retain(|v| {
             let degrees = self.nquery.degree_profile(&v);
             dominates_profile(&degrees, &degree_profile)
         });
 
-        println!("  > Found {} out of {n} as witness candidates for {}-shattered set", self.witness_candidates.len(), self.vc_dim);
+        println!("  > Found {} out of {n} as witness candidates for {}-shattered set", self.shatter_candidates.len(), self.vc_dim);
 
         self.cover_candidates.retain(|v| {
             let mut covers = false;
             for u in self.graph.left_neighbours_slice(&v) {
-                if self.witness_candidates.contains(u) {
+                if self.shatter_candidates.contains(u) {
                     covers = true;
                     break;
                 }
