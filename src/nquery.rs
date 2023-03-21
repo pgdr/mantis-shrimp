@@ -139,7 +139,10 @@ mod  tests {
     fn shattered_test1 () {
         let mut graph = EditGraph::from_txt("test1_shattered.txt").expect("File not found.");
         graph.remove_loops();
-        let mut nquery = NQuery::new(graph);
+        let graph = DegenGraph::from_graph(&graph);  
+
+        let mut nquery = NQuery::new(&graph);
+        nquery.ensure_size(4, &graph.vertices().cloned().collect());
 
         let sh_set = BTreeSet::from([1, 2, 3, 4]);
         let result = nquery.is_shattered(&sh_set);
@@ -150,7 +153,10 @@ mod  tests {
     fn shattered_test2 () {
         let mut graph = EditGraph::from_txt("test1_shattered.txt").expect("File not found.");
         graph.remove_loops();
-        let mut nquery = NQuery::new(graph);
+        let graph = DegenGraph::from_graph(&graph);  
+
+        let mut nquery = NQuery::new(&graph);
+        nquery.ensure_size(4, &graph.vertices().cloned().collect());
 
         let unsh_set = BTreeSet::from([1, 2, 3, 16]);
         let result = nquery.is_shattered(&unsh_set);
