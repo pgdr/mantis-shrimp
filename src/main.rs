@@ -42,7 +42,7 @@ struct Args {
 
 fn main() -> Result<(), &'static str> {
     let args = Args::parse();
-    let filename = args.file.clone();
+    let filename = args.file;
 
     // Load graph
     let path = Path::new(&filename);

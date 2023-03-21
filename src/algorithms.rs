@@ -36,7 +36,7 @@ fn dominates_profile(degA:&Vec<usize>, degB:&Vec<usize>) -> bool {
         }
     }
 
-    return true;
+    true
 }
 
 pub struct VCAlgorithm<'a> {
@@ -57,8 +57,8 @@ impl<'a> VCAlgorithm<'a> {
         let shatter_candidates:VertexSet = graph.vertices().cloned().collect();
         let mut cover_candidates:VertexSet = shatter_candidates.iter().cloned().collect(); 
 
-        let mut nquery = NQuery::new(&graph);
-        VCAlgorithm{ graph, d, logd, shatter_candidates: shatter_candidates, cover_candidates, nquery, vc_dim: 1}
+        let mut nquery = NQuery::new(graph);
+        VCAlgorithm{ graph, d, logd, shatter_candidates, cover_candidates, nquery, vc_dim: 1}
     }
 
     pub fn run(&mut self) {
@@ -96,11 +96,11 @@ impl<'a> VCAlgorithm<'a> {
                     // Collect candidate set
                     let mut N:VertexSet = C.iter().map(|u| **u).collect();
                     for &u in &C {
-                        N.extend( self.graph.left_neighbours_slice(&u));
+                        N.extend( self.graph.left_neighbours_slice(u));
                     }
 
                     // Retain only those elements that are witness candidates
-                    N = N.iter().filter(|x| self.shatter_candidates.contains(x) ).cloned().collect();
+                    N.retain(|x| self.shatter_candidates.contains(x) );
 
                     if N.len() < self.vc_dim+1 {
                         continue;
@@ -144,7 +144,7 @@ impl<'a> VCAlgorithm<'a> {
         println!("  > Degree profile is {degree_profile:?}");
 
         self.shatter_candidates.retain(|v| {
-            let degrees = self.nquery.degree_profile(&v);
+            let degrees = self.nquery.degree_profile(v);
             dominates_profile(&degrees, &degree_profile)
         });
 
@@ -152,7 +152,7 @@ impl<'a> VCAlgorithm<'a> {
 
         self.cover_candidates.retain(|v| {
             let mut covers = false;
-            for u in self.graph.left_neighbours_slice(&v) {
+            for u in self.graph.left_neighbours_slice(v) {
                 if self.shatter_candidates.contains(u) {
                     covers = true;
                     break;

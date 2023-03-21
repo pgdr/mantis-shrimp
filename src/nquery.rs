@@ -16,9 +16,7 @@ impl<'a> NQuery<'a> {
     pub fn new(graph:&'a DegenGraph) -> Self {  
         let mut R:FxHashMap<_, _> = FxHashMap::default();
 
-        let mut res = NQuery { R, graph, max_query_size: 0 };
-
-        res        
+        NQuery { R, graph, max_query_size: 0 }
     }
 
     fn query_uncor(&self, X: &BTreeSet<Vertex>, S: &BTreeSet<Vertex>) -> i32 {
@@ -26,7 +24,7 @@ impl<'a> NQuery<'a> {
             return 0
         }
 
-        let S_minus_X:BTreeSet<_> = S.difference(&X).collect();
+        let S_minus_X:BTreeSet<_> = S.difference(X).collect();
         let mut res:i32 = 0;
 
         for subset in S_minus_X.into_iter().powerset() {
@@ -62,7 +60,7 @@ impl<'a> NQuery<'a> {
         for s in (self.max_query_size+1)..=size {
             for u in self.graph.vertices() {
                 let mut N = self.graph.left_neighbours(u);
-                N = N.iter().filter(|x| query_candidates.contains(x)).cloned().collect();
+                N.retain(|x| query_candidates.contains(x));
     
                 for subset in N.into_iter().combinations(s) {
                     self.R.entry(subset.into_iter().collect()).and_modify(|c| *c += 1).or_insert(1);
@@ -114,12 +112,12 @@ impl<'a> NQuery<'a> {
                 return false
             }
         }
-        return true
+        true
     }
 
     pub fn degree_profile(&self, v:&Vertex) -> Vec<usize> {
         let mut degrees = Vec::default();
-        for u in self.graph.neighbours(&v) {
+        for u in self.graph.neighbours(v) {
             degrees.push(self.graph.degree(u) as usize);
         }
         degrees.sort_unstable();
