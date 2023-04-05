@@ -6,6 +6,7 @@
 mod io;
 mod nquery;
 mod algorithms;
+mod setfunc;
 
 // use std::backtrace::Backtrace;
 use std::collections::BTreeSet;
@@ -67,68 +68,5 @@ fn main() -> Result<(), &'static str> {
     let mut alg = VCAlgorithm::new(&graph);
     alg.run();
 
-
-    // let mut graph = EditGraph::from_gzipped("Yeast.txt.gz").expect("File not found");   
-    // let n = graph.num_vertices();
-    // let mut nquery = NQuery::new(&graph);
-    
-    // Phase 1: Linear scan
-    // let mut k = 2;
-
-    // let order:Vec<_> = graph.vertices().cloned().collect();
-
-    // let mut improved = true;
-    // while improved && k+1 <= d {
-    //     improved = false;
-    //     for &v in &order {
-    //         let mut N = graph.left_neighbours(&v);
-    //         N.push(v);
-
-    //         for S in N.iter().combinations(k+1) {
-    //             let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
-    //             if nquery.is_shattered(&S) {
-    //                 k = k + 1;
-    //                 println!("Found shattered set of size {k}");                    
-    //                 improved = true;
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
-
-    // println!("Largest one-covered shattered set: {:?}", k);
-
-    // Check which vertices are valid candidates for a shattered set 
-    // of size k
-    // let degree_profile = generate_degree_profile(k+1);
-    // println!("{degree_profile:?}");
-
-    // let mut witness_candidates:VertexSet = VertexSet::default();
-    // for &v in graph.vertices() {
-    //     let degrees = nquery.degree_profile(&v);
-    //     if dominates_profile(&degrees, &degree_profile) {
-    //         witness_candidates.insert(v);
-    //     }
-    // }
-
-    // println!("Found {} out of {n} as witness candidates for {k}-shattered set", witness_candidates.len());
-
-    // let mut cover_candidates:VertexSet = witness_candidates.iter().cloned().collect(); 
-    // for &v in graph.vertices() {
-    //     let mut covers = false;
-    //     for u in graph.left_neighbours_slice(&v) {
-    //         if witness_candidates.contains(u) {
-    //             covers = true;
-    //             break;
-    //         }
-    //     }
-    //     if covers {
-    //         cover_candidates.insert(v);
-    //     }
-    // }
-
-    // println!("Found {} out of {n} as cover candidates for {k}-shattered set", cover_candidates.len());
-
-    // Look for chunks of size k / log d
     Ok(())
 }
