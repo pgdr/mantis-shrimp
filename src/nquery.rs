@@ -84,8 +84,6 @@ impl<'a> NQuery<'a> {
         let mut S:Vec<u32> = S.iter().cloned().collect();
         S.sort_unstable();
 
-        println!("{S:?}");
-
         let mut I = SmallSetFunc::new(&S);
         
         assert!(S.len() <= self.max_query_size);
@@ -100,16 +98,13 @@ impl<'a> NQuery<'a> {
 
         // Insert correct value for the empty set manually
         I[&vec![]] = self.graph.num_vertices() as i32 - res_sum;
-        println!("{I}");
 
         // correction
         let left_neighs = self.left_neighbour_set(&S);
-        println!("Left-neighbours = {left_neighs:?}");
 
         for v in left_neighs {   
             // Collect v's left and right neighbourhoods 
             let N: Vec<Vertex> = self.graph.neighbours(&v).cloned().sorted_unstable().collect();
-            println!("{v} has neighbours {N:?}");
             let N_left: Vec<Vertex> = self.graph.left_neighbours(&v).into_iter().sorted_unstable().collect();
             let N_right = difference(&N, &N_left);
             
@@ -120,11 +115,9 @@ impl<'a> NQuery<'a> {
             let N = union(&N_left, &N_right);
 
             debug_assert!(I[&N_left] > 0);
-            println!("Move {v} from {N_left:?} to {N:?}");
             I[&N_left] -= 1;
             I[&N] += 1;
         }
-        println!("{I}");
         
         if I.count_nonzero() != 2_usize.pow(S.len() as u32) {
             return false
@@ -187,7 +180,6 @@ mod  tests {
             let mut v = k;
             let mut order = (0..k).into_iter().collect_vec();
             for set in (0..k).into_iter().powerset() {
-                println!("{v} -> {set:?}");
                 G.add_vertex(&v);
                 for u in set {
                     G.add_edge(&u, &v);
@@ -204,7 +196,6 @@ mod  tests {
             assert_eq!(result, true);
 
             order.shuffle(&mut rng);
-            println!("{order:?}");
             let D = DegenGraph::with_ordering(&G, order.iter());
             let mut nquery = NQuery::new(&D);
             nquery.ensure_size(k as usize, &D.vertices().cloned().collect());
