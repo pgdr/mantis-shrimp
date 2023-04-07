@@ -24,7 +24,11 @@ impl SetFunc {
         let Q = Q.into_iter().cloned().collect_vec();
         let mut res = SmallSetFunc::new(&Q);
         for subset in Q.into_iter().powerset() {
-            res[&subset] = self.values[&subset];
+            if let Some(value) = self.values.get(&subset) {
+                if *value != 0 {
+                    res[&subset] = *value;
+                }
+            }
         }
         res
     }
@@ -130,15 +134,12 @@ impl SmallSetFunc {
         
         self.values.values_mut().for_each(|val| *val = -*val);
         for ix in 0..n {
-            println!("Index {ix} - element {}", self.universe[ix]);
-
             // Find all sets which do _not_ contain element w/ index ix 
             let ix_bit = 1 << ix;
             let active = self.values.keys().filter(|bitset| (**bitset & ix_bit) == 0).cloned().collect_vec();
             for target in active {
                 let source = target | ix_bit; 
-                println!("  source = {:?}, target = {:?}", self.convert_bitset(source), self.convert_bitset(target));
-                let val = self.values[&source];
+                let val = *self.values.get(&source).unwrap_or(&0);
                 self.values.entry(target).and_modify(|e| *e = val - *e);
             }
         }
@@ -157,6 +158,11 @@ impl SmallSetFunc {
             .map(|(bitset,_)| (self.convert_bitset(*bitset)) );
         res
     }   
+
+    pub fn values_nonzero(&self) -> impl Iterator<Item=i32> + '_ {
+        let res = self.values.values().cloned().filter(|value| *value != 0);
+        res
+    }
 
     pub fn count_nonzero(&self) -> usize {
         self.values.iter().filter(|(_, value)| **value != 0).count()

@@ -74,23 +74,14 @@ impl<'a> NQuery<'a> {
         self.max_query_size = size;
     }
 
-    pub fn is_shattered(&mut self, S: &Vec<Vertex>) -> bool {
+    pub fn is_shattered(&mut self, S: &[Vertex]) -> bool {
         let mut S:Vec<u32> = S.iter().cloned().collect();
         S.sort_unstable();
-
-        let mut I = SmallSetFunc::new(&S);
-        
         assert!(S.len() <= self.max_query_size);
 
-        // let I = self.R.subfunc(S);
-
-        let mut res_sum = 0;
-        for subset in S.iter().powerset() { 
-            let subset:Vec<u32> = subset.into_iter().cloned().collect();
-            let res = self.query_uncor(&subset, &S);
-            res_sum += res;
-            I[&subset] = res;
-        }
+        let mut I = self.R.subfunc(&S); // Copies R into I on S
+        I.mobius_trans_down();
+        let res_sum:i32 = I.values_nonzero().sum();
 
         // Insert correct value for the empty set manually
         I[&vec![]] = self.graph.num_vertices() as i32 - res_sum;
