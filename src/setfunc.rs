@@ -6,6 +6,7 @@ use core::fmt;
 use std::ops::{Index, IndexMut, Add, Sub};
 
 use fxhash::FxHashMap;
+use itertools::Itertools;
 
 #[derive(Debug)]
 pub struct SetFunc {
@@ -15,6 +16,17 @@ pub struct SetFunc {
 impl SetFunc {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn subfunc<'a, I>(&self, Q:I) -> SmallSetFunc 
+        where I: IntoIterator<Item=&'a u32> 
+    {
+        let Q = Q.into_iter().cloned().collect_vec();
+        let mut res = SmallSetFunc::new(&Q);
+        for subset in Q.into_iter().powerset() {
+            res[&subset] = self.values[&subset];
+        }
+        res
     }
 
     pub fn entries_nonzero(&self) -> impl Iterator<Item=(&Vec<u32>, i32)> + '_ {
@@ -64,7 +76,7 @@ impl<'a, I> IndexMut<I> for SetFunc where I: IntoIterator<Item=&'a u32> {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct SmallSetFunc {
     universe:Vec<u32>,
     index_map:FxHashMap<u32, u8>,
@@ -78,6 +90,10 @@ impl SmallSetFunc {
         universe.dedup();
 
         Self::from_sorted_vec(universe)
+    }
+
+    pub fn size(&self) -> usize {
+        self.universe.len()
     }
 
     fn from_sorted_vec(universe:Vec<u32>) -> Self {
@@ -107,6 +123,25 @@ impl SmallSetFunc {
         }
 
         res
+    }
+
+    pub fn mobius_trans_down(&mut self) {
+        let n = self.size();
+        
+        self.values.values_mut().for_each(|val| *val = -*val);
+        for ix in 0..n {
+            println!("Index {ix} - element {}", self.universe[ix]);
+
+            // Find all sets which do _not_ contain element w/ index ix 
+            let ix_bit = 1 << ix;
+            let active = self.values.keys().filter(|bitset| (**bitset & ix_bit) == 0).cloned().collect_vec();
+            for target in active {
+                let source = target | ix_bit; 
+                println!("  source = {:?}, target = {:?}", self.convert_bitset(source), self.convert_bitset(target));
+                let val = self.values[&source];
+                self.values.entry(target).and_modify(|e| *e = val - *e);
+            }
+        }
     }
 
     pub fn entries_nonzero(&self) -> impl Iterator<Item=(Vec<u32>, i32)> + '_ {
@@ -194,4 +229,63 @@ impl fmt::Display for SmallSetFunc {
         f.write_str("}")?;
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::vecset::{difference, union};
+
+    use super::*;
+
+    #[test]
+    fn test_inversion() {
+        println!("-----------------------------");
+        let mut R:SetFunc = SetFunc::new();
+        R[&vec![]] = 751;
+        R[&vec![0]] = 25;
+        R[&vec![1]] = 133;
+        R[&vec![2]] = 125;
+        R[&vec![0,1]] = 235;
+        R[&vec![0,2]] = 325;
+        R[&vec![1,2]] = 124;
+        R[&vec![0,1,2]] = 35;
+
+        let f:SmallSetFunc = R.subfunc(&vec![0,1,2]);
+        let mut F:SmallSetFunc = f.clone();
+
+        for X in vec![0u32,1,2].into_iter().powerset() {
+            assert_eq!(R[&X], f[&X]);
+            assert_eq!(f[&X], F[&X]);
+        }
+
+        F.mobius_trans_down();
+
+        println!("f = {f}");
+        println!("F = {F}");
+
+        let S = vec![0u32,1,2];
+        let mut FF = SmallSetFunc::new(&S);
+        for X in vec![0u32,1,2].into_iter().powerset() {
+            let S_minus_X:Vec<_> = difference(&S, &X);
+            let mut res:i32 = 0;
+
+            for Y in S_minus_X.into_iter().powerset() {
+                let Y = union(&X, &Y);
+
+                if Y.len() % 2 == 0 {
+                    res += R[&Y];
+                } else {
+                    res -= R[&Y];
+                }
+            }
+            FF[&X] = res;
+        }
+
+        println!("FF = {FF}");
+        for X in vec![0u32,1,2].into_iter().powerset() {
+            assert_eq!(F[&X], FF[&X]);
+        }
+        println!("-----------------------------");
+    }
+
 }

@@ -41,12 +41,6 @@ impl<'a> NQuery<'a> {
         res
     }
 
-    fn fast_mobius(&self, S: &BTreeSet<Vertex>) -> FxHashMap<BTreeSet<Vertex>, i32> {
-        
-
-        todo!()
-    }
-
     fn left_neighbour_set(&self, S: &Vec<Vertex>) -> Vec<Vertex> {
         let mut res: BTreeSet<Vertex> = BTreeSet::default();
 
@@ -87,6 +81,8 @@ impl<'a> NQuery<'a> {
         let mut I = SmallSetFunc::new(&S);
         
         assert!(S.len() <= self.max_query_size);
+
+        // let I = self.R.subfunc(S);
 
         let mut res_sum = 0;
         for subset in S.iter().powerset() { 
