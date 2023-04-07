@@ -8,7 +8,64 @@ use std::ops::{Index, IndexMut, Add, Sub};
 use fxhash::FxHashMap;
 
 #[derive(Debug)]
-struct SmallSetFunc {
+pub struct SetFunc {
+    values:FxHashMap<Vec<u32>, i32>
+}
+
+impl SetFunc {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn entries_nonzero(&self) -> impl Iterator<Item=(&Vec<u32>, i32)> + '_ {
+        let res = self.values.iter()
+            .filter(|(_, value)| **value != 0)
+            .map(|(set,value)| (set, *value) );
+        res
+    }
+
+    pub fn keys_nonzero(&self) -> impl Iterator<Item=&Vec<u32>> + '_ {
+        let res = self.values.iter()
+            .filter(|(_, value)| **value != 0)
+            .map(|(set,_)| set );
+        res
+    }       
+}
+
+impl Default for SetFunc {
+    fn default() -> Self {
+        Self { values: FxHashMap::default() }
+    }
+}
+
+impl<'a, I> Index<I> for SetFunc where I: IntoIterator<Item=&'a u32> {
+    type Output = i32;
+
+    fn index(&self, query: I) -> &Self::Output {
+        let mut set:Vec<u32> = query.into_iter().cloned().collect();
+        set.sort_unstable();
+        set.dedup();
+
+        if self.values.contains_key(&set) {
+            &self.values[&set]
+        } else {
+            &0
+        }
+    }
+}
+
+impl<'a, I> IndexMut<I> for SetFunc where I: IntoIterator<Item=&'a u32> {
+    fn index_mut(&mut self, query: I) -> &mut Self::Output {
+        let mut set:Vec<u32> = query.into_iter().cloned().collect();
+        set.sort_unstable();
+        set.dedup();
+        self.values.entry(set).or_default()
+    }
+}
+
+
+#[derive(Debug)]
+pub struct SmallSetFunc {
     universe:Vec<u32>,
     index_map:FxHashMap<u32, u8>,
     values:FxHashMap<u128, i32>    

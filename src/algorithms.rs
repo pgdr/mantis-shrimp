@@ -77,7 +77,8 @@ impl<'a> VCAlgorithm<'a> {
                 println!("Brute-force: ({} choose {}) candidates", self.shatter_candidates.len(), self.vc_dim+1 );        
                 // Test each subset of size vc_dim+1 whether it is shattered
                 for S in self.shatter_candidates.iter().combinations(self.vc_dim+1) {
-                    let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
+                    let S:Vec<u32> = S.into_iter().cloned().collect(); // TODO: Better way of converting Vec<&u32> to Vec<u32>?
+
                     if self.nquery.is_shattered(&S) {
                         self.vc_dim += 1;
                         println!("Found shattered set of size {}", self.vc_dim);                    
@@ -109,7 +110,7 @@ impl<'a> VCAlgorithm<'a> {
                     // Test each subset of size vc_dim+1 whether it is shattered
                     // println!("  Checking ({} choose {}) subsets for cover {:?}", N.len(), self.vc_dim+1, C);
                     for S in N.iter().combinations(self.vc_dim+1) {
-                        let S:BTreeSet<Vertex> = S.into_iter().cloned().collect();
+                        let S = S.into_iter().cloned().collect();
                         if self.nquery.is_shattered(&S) {
                             self.vc_dim += 1;
                             println!("Found shattered set of size {}", self.vc_dim);                    

@@ -7,6 +7,7 @@ mod io;
 mod nquery;
 mod algorithms;
 mod setfunc;
+mod vecset;
 
 // use std::backtrace::Backtrace;
 use std::collections::BTreeSet;
