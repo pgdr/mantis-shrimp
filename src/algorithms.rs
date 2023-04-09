@@ -6,6 +6,7 @@ use graphbench::degengraph::DegenGraph;
 use crate::nquery::NQuery;
 
 use itertools::*;
+use crate::skipcombs::{SkippableCombinations, SkippableCombinationsIter};
 
 fn binom(n: usize, k: usize) -> usize {
     let mut res = 1;
@@ -71,6 +72,7 @@ impl<'a> VCAlgorithm<'a> {
         let mut improved = true;
         let mut cover_size = 1;
 
+        // Main loop: try to find larger and larger shattered sets
         while improved && self.vc_dim <= self.d+1 {
             improved = false;
 
@@ -82,39 +84,15 @@ impl<'a> VCAlgorithm<'a> {
             if brute_force_estimate < cover_estimate {
                 println!("Brute-force: ({} choose {}) candidates", self.shatter_candidates.len(), self.vc_dim+1 );        
                 // Test each subset of size vc_dim+1 whether it is shattered
-                if self.vc_dim <= 3 {
-                    for S in self.shatter_candidates.iter().combinations(self.vc_dim+1) {
-                        let S:Vec<u32> = S.into_iter().cloned().collect(); // TODO: Better way of converting Vec<&u32> to Vec<u32>?
-                        
-                        if self.nquery.is_shattered(&S) {
-                            self.vc_dim += 1;
-                            println!("Found shattered set of size {}", self.vc_dim);                    
-                            improved = true;
-                            break;
-                        }                                            
-                    }
-                } else {
-                    let mut taboo = vec![u32::MAX; 3];
-                    for S in self.shatter_candidates.iter().combinations(self.vc_dim+1) {
-                        let S:Vec<u32> = S.into_iter().cloned().collect(); // TODO: Better way of converting Vec<&u32> to Vec<u32>?
-                        
-                        if S[..3] == taboo {
-                            continue; 
-                        }
-
-                        if !self.nquery.is_shattered(&S[..3]) {
-                            taboo.copy_from_slice(&S[..3]); // New taboo prefix
-                            continue
-                        }
-                        taboo = vec![u32::MAX; 3];
-
-                        if self.nquery.is_shattered(&S) {
-                            self.vc_dim += 1;
-                            println!("Found shattered set of size {}", self.vc_dim);                    
-                            improved = true;
-                            break;
-                        }                                            
-                    }                    
+                for S in self.shatter_candidates.iter().combinations(self.vc_dim+1) {
+                    let S:Vec<u32> = S.into_iter().cloned().collect(); // TODO: Better way of converting Vec<&u32> to Vec<u32>?
+                    
+                    if self.nquery.is_shattered(&S) {
+                        self.vc_dim += 1;
+                        println!("Found shattered set of size {}", self.vc_dim);                    
+                        improved = true;
+                        break;
+                    }                                            
                 }
 
                 if !improved {
@@ -141,8 +119,13 @@ impl<'a> VCAlgorithm<'a> {
 
                     // Test each subset of size vc_dim+1 whether it is shattered
                     // println!("  Checking ({} choose {}) subsets for cover {:?}", N.len(), self.vc_dim+1, C);
-                    for S in N.iter().combinations(self.vc_dim+1) {
-                        let S = S.into_iter().cloned().collect_vec();
+                    let mut it = N.into_iter().combinations_skippable(self.vc_dim+1);
+                    while let Some(S) = it.next() {
+                        if self.vc_dim+1 > 3 && !self.nquery.is_shattered(&S[..3]) {
+                            it.skip_prefix(3);
+                            continue;
+                        }
+
                         if self.nquery.is_shattered(&S) {
                             self.vc_dim += 1;
                             println!("Found shattered set of size {}", self.vc_dim);                    
@@ -159,40 +142,6 @@ impl<'a> VCAlgorithm<'a> {
                     // it does not contain shattered sets of size vc_dim+1.
                     self.local_upper_bound.entry(*c).and_modify(|e| *e = std::cmp::min(*e, self.vc_dim as u8));
                 }                    
-            } else if cover_size <= 4 {
-                println!("Covering: ({} choose {}) candidates", self.cover_candidates.len(), cover_size );
-                'outer: for C in self.cover_candidates.iter().combinations(cover_size) {
-                    let joint_upper_bound:usize = C.iter().map(|u| self.local_upper_bound[u] as usize).sum(); 
-                    if joint_upper_bound <= self.vc_dim {
-                        continue;
-                    }
-
-                    // Collect candidate set
-                    let mut N:VertexSet = C.iter().map(|u| **u).collect();
-                    for &u in &C {
-                        N.extend( self.graph.left_neighbours_slice(u));
-                    }
-
-                    // Retain only those elements that are witness candidates
-                    N.retain(|x| self.shatter_candidates.contains(x) );
-
-                    if N.len() <= self.vc_dim {
-                        continue;
-                    }
-
-                    // Test each subset of size vc_dim+1 whether it is shattered
-                    // println!("  Checking ({} choose {}) subsets for cover {:?}", N.len(), self.vc_dim+1, C);
-                    for S in N.iter().combinations(self.vc_dim+1) {
-                        let S = S.into_iter().cloned().collect_vec();
-
-                        if self.nquery.is_shattered(&S) {
-                            self.vc_dim += 1;
-                            println!("Found shattered set of size {}", self.vc_dim);                    
-                            improved = true;
-                            break 'outer;
-                        }
-                    }
-                }                
             } else {
                 println!("Covering: ({} choose {}) candidates", self.cover_candidates.len(), cover_size );
                 'outer: for C in self.cover_candidates.iter().combinations(cover_size) {
@@ -215,18 +164,13 @@ impl<'a> VCAlgorithm<'a> {
                     }
 
                     // Test each subset of size vc_dim+1 whether it is shattered
-                    let mut taboo = vec![u32::MAX; 3];
-                    for S in N.iter().combinations(self.vc_dim+1) {
-                        let S:Vec<u32> = S.into_iter().cloned().collect();
-                        if S[..3] == taboo {
-                            continue; 
+                    // println!("  Checking ({} choose {}) subsets for cover {:?}", N.len(), self.vc_dim+1, C);
+                    let mut it = N.into_iter().combinations_skippable(self.vc_dim+1);
+                    while let Some(S) = it.next() {
+                        if self.vc_dim+1 > 3 && !self.nquery.is_shattered(&S[..3]) {
+                            it.skip_prefix(3);
+                            continue;
                         }
-
-                        if !self.nquery.is_shattered(&S[..3]) {
-                            taboo.copy_from_slice(&S[..3]); // New taboo prefix
-                            continue
-                        }
-                        taboo = vec![u32::MAX; 3];
 
                         if self.nquery.is_shattered(&S) {
                             self.vc_dim += 1;
@@ -235,8 +179,8 @@ impl<'a> VCAlgorithm<'a> {
                             break 'outer;
                         }
                     }
-                }              
-            }
+                }                
+            } 
 
             if improved {
                 println!("Found larger set, recomputing ");
