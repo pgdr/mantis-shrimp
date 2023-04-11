@@ -81,6 +81,7 @@ impl<'a> NQuery<'a> {
 
         let mut I = self.R.subfunc(&S); // Copies R into I on S
         I.mobius_trans_down();
+
         let res_sum:i32 = I.values_nonzero().sum();
 
         // Insert correct value for the empty set manually
@@ -101,7 +102,7 @@ impl<'a> NQuery<'a> {
 
             let N = union(&N_left, &N_right);
 
-            debug_assert!(I[&N_left] > 0);
+            assert!(I[&N_left] > 0);
             I[&N_left] -= 1;
             I[&N] += 1;
         }

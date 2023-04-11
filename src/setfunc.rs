@@ -132,15 +132,16 @@ impl SmallSetFunc {
     pub fn mobius_trans_down(&mut self) {
         let n = self.size();
         
-        self.values.values_mut().for_each(|val| *val = -*val);
         for ix in 0..n {
             // Find all sets which do _not_ contain element w/ index ix 
             let ix_bit = 1 << ix;
             let active = self.values.keys().filter(|bitset| (**bitset & ix_bit) == 0).cloned().collect_vec();
+
             for target in active {
                 let source = target | ix_bit; 
                 let val = *self.values.get(&source).unwrap_or(&0);
-                self.values.entry(target).and_modify(|e| *e = val - *e);
+
+                *self.values.entry(target).or_insert(0) -= val; // .and_modify(|e| *e = *e - val);
             }
         }
     }
@@ -244,7 +245,55 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_inversion() {
+    fn test_inversion_2() {
+        println!("-----------------------------");
+        let mut R:SetFunc = SetFunc::new();
+        R[&vec![]] = 751;
+        R[&vec![0]] = 25;
+        R[&vec![1]] = 133;
+        R[&vec![0,1]] = 235;
+
+        let f:SmallSetFunc = R.subfunc(&vec![0,1]);
+        let mut F:SmallSetFunc = f.clone();
+
+        for X in vec![0u32,1].into_iter().powerset() {
+            assert_eq!(R[&X], f[&X]);
+            assert_eq!(f[&X], F[&X]);
+        }
+
+        F.mobius_trans_down();
+
+        println!("f = {f}");
+        println!("F = {F}");
+
+        let S = vec![0u32,1];
+        let mut FF = SmallSetFunc::new(&S);
+        for X in vec![0u32,1].into_iter().powerset() {
+            let S_minus_X:Vec<_> = difference(&S, &X);
+            let mut res:i32 = 0;
+
+            for Y in S_minus_X.into_iter().powerset() {
+                let k = Y.len();
+                let Y = union(&X, &Y);
+
+                if k % 2 == 0 {
+                    res += R[&Y];
+                } else {
+                    res -= R[&Y];
+                }
+            }
+            FF[&X] = res;
+        }
+
+        println!("FF = {FF}");
+        for X in vec![0u32,1].into_iter().powerset() {
+            assert_eq!(F[&X], FF[&X]);
+        }
+        println!("-----------------------------");
+    }    
+
+    #[test]
+    fn test_inversion_3() {
         println!("-----------------------------");
         let mut R:SetFunc = SetFunc::new();
         R[&vec![]] = 751;
@@ -276,9 +325,10 @@ mod tests {
             let mut res:i32 = 0;
 
             for Y in S_minus_X.into_iter().powerset() {
+                let k = Y.len();
                 let Y = union(&X, &Y);
 
-                if Y.len() % 2 == 0 {
+                if k % 2 == 0 {
                     res += R[&Y];
                 } else {
                     res -= R[&Y];

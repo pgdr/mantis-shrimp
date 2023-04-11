@@ -84,15 +84,30 @@ impl<'a> VCAlgorithm<'a> {
             if brute_force_estimate < cover_estimate {
                 println!("Brute-force: ({} choose {}) candidates", self.shatter_candidates.len(), self.vc_dim+1 );        
                 // Test each subset of size vc_dim+1 whether it is shattered
-                for S in self.shatter_candidates.iter().combinations(self.vc_dim+1) {
+                let mut it = self.shatter_candidates.iter().combinations_skippable(self.vc_dim+1);
+                while let Some(S) = it.next()  {                    
                     let S:Vec<u32> = S.into_iter().cloned().collect(); // TODO: Better way of converting Vec<&u32> to Vec<u32>?
                     
                     if self.nquery.is_shattered(&S) {
                         self.vc_dim += 1;
-                        println!("Found shattered set of size {}", self.vc_dim);                    
+                        println!("Found shattered set of size {}: {:?}", self.vc_dim, S);
+                                          
                         improved = true;
                         break;
-                    }                                            
+                    }
+
+
+                    // Figure out what prefix of the current set is not shattered
+                    // and skip all subsequent combinations with the same prefix.
+                    if self.vc_dim+1 > 3 {
+                        let mut k = 2;
+                        while self.nquery.is_shattered(&S[..k]) && k < self.vc_dim-1 {
+                            k += 1;
+                        }
+                        if k < self.vc_dim-1 {
+                            it.skip_prefix(k);
+                        }
+                    }                         
                 }
 
                 if !improved {
@@ -121,14 +136,9 @@ impl<'a> VCAlgorithm<'a> {
                     // println!("  Checking ({} choose {}) subsets for cover {:?}", N.len(), self.vc_dim+1, C);
                     let mut it = N.into_iter().combinations_skippable(self.vc_dim+1);
                     while let Some(S) = it.next() {
-                        if self.vc_dim+1 > 3 && !self.nquery.is_shattered(&S[..3]) {
-                            it.skip_prefix(3);
-                            continue;
-                        }
-
                         if self.nquery.is_shattered(&S) {
                             self.vc_dim += 1;
-                            println!("Found shattered set of size {}", self.vc_dim);                    
+                            println!("Found shattered set of size {}: {:?}", self.vc_dim, S);
 
                             // Update local lower bound on vc dimension
                             self.local_lower_bound.insert(*c, self.vc_dim as u8);
@@ -136,6 +146,18 @@ impl<'a> VCAlgorithm<'a> {
                             improved = true;
                             break 'outer;
                         }
+
+                        // Figure out what prefix of the current set is not shattered
+                        // and skip all subsequent combinations with the same prefix.
+                        if self.vc_dim+1 > 3 {
+                            let mut k = 2;
+                            while self.nquery.is_shattered(&S[..k]) && k < self.vc_dim-1 {
+                                k += 1;
+                            }
+                            if k < self.vc_dim-1 {
+                                it.skip_prefix(k);
+                            }
+                        }                        
                     }
 
                     // We exhaustively searched this vertex' neighbourhood, so we know
@@ -143,17 +165,30 @@ impl<'a> VCAlgorithm<'a> {
                     self.local_upper_bound.entry(*c).and_modify(|e| *e = std::cmp::min(*e, self.vc_dim as u8));
                 }                    
             } else {
+                // We proved that if the shattered set has size at least $p:= \ceil{\log d + 1}$, then 
+                // there exists a left-cover in which every vertex sees at least a $1 / p$ fraction of the solution.
+                // Therefore, we can exclude vertices whose local upper bound is less than $\ceil{(vc_dim + 1) / p}$.
+                let p = f32::ceil(self.logd + 1f32) as usize;
+                let candidates = if (self.vc_dim+1) >= p {
+                    let k = self.vc_dim + 1;
+                    let limit = (k / p) as u8 + u8::from( k / p != 0 ); // This is equal to ceil( k / p)
+                    self.cover_candidates.iter().filter(|v| self.local_upper_bound[v] >= limit).cloned().collect_vec()
+                } else {
+                    self.cover_candidates.iter().cloned().collect_vec()
+                };
+
+
                 println!("Covering: ({} choose {}) candidates", self.cover_candidates.len(), cover_size );
-                'outer: for C in self.cover_candidates.iter().combinations(cover_size) {
+                'outer: for C in candidates.into_iter().combinations(cover_size) {
                     let joint_upper_bound:usize = C.iter().map(|u| self.local_upper_bound[u] as usize).sum(); 
                     if joint_upper_bound <= self.vc_dim {
                         continue;
                     }
 
                     // Collect candidate set
-                    let mut N:VertexSet = C.iter().map(|u| **u).collect();
+                    let mut N:VertexSet = C.iter().map(|u| *u).collect();
                     for &u in &C {
-                        N.extend( self.graph.left_neighbours_slice(u));
+                        N.extend( self.graph.left_neighbours_slice(&u));
                     }
 
                     // Retain only those elements that are witness candidates
@@ -167,17 +202,24 @@ impl<'a> VCAlgorithm<'a> {
                     // println!("  Checking ({} choose {}) subsets for cover {:?}", N.len(), self.vc_dim+1, C);
                     let mut it = N.into_iter().combinations_skippable(self.vc_dim+1);
                     while let Some(S) = it.next() {
-                        if self.vc_dim+1 > 3 && !self.nquery.is_shattered(&S[..3]) {
-                            it.skip_prefix(3);
-                            continue;
-                        }
-
                         if self.nquery.is_shattered(&S) {
                             self.vc_dim += 1;
-                            println!("Found shattered set of size {}", self.vc_dim);                    
+                            println!("Found shattered set of size {}: {:?}", self.vc_dim, S);
                             improved = true;
                             break 'outer;
                         }
+
+                        // Figure out what prefix of the current set is not shattered
+                        // and skip all subsequent combinations with the same prefix.
+                        if self.vc_dim+1 > 3 {
+                            let mut k = 2;
+                            while self.nquery.is_shattered(&S[..k]) && k < self.vc_dim-1 {
+                                k += 1;
+                            }
+                            if k < self.vc_dim-1 {
+                                it.skip_prefix(k);
+                            }
+                        }      
                     }
                 }                
             } 
@@ -223,6 +265,7 @@ impl<'a> VCAlgorithm<'a> {
             self.local_upper_bound.entry(*v).and_modify(|e| *e = std::cmp::min(*e, num_cands as u8));
 
             // v only remains a cover candidate if it sees at least one 
+            // candiate vertex
             num_cands > 0
         });
 
