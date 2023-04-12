@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use graphbench::graph::*;
+use graphbench::{graph::*, iterators::LeftNeighIterable};
 use graphbench::degengraph::DegenGraph;
 
 use crate::nquery::NQuery;
@@ -79,7 +79,7 @@ impl<'a> VCAlgorithm<'a> {
             let brute_force_estimate = binom(self.shatter_candidates.len(), self.vc_dim+1);
             let cover_estimate = binom(self.cover_candidates.len(), cover_size) * binom(cover_size * self.d, self.vc_dim+1);
 
-            self.nquery.ensure_size(self.vc_dim+1, &self.shatter_candidates);
+            self.nquery.ensure_size_restricted(self.vc_dim+1, &self.shatter_candidates);
 
             if brute_force_estimate < cover_estimate {
                 println!("Brute-force: ({} choose {}) candidates", self.shatter_candidates.len(), self.vc_dim+1 );        
@@ -273,3 +273,49 @@ impl<'a> VCAlgorithm<'a> {
     }
 }   
 
+
+
+pub struct LadderAlgorithm<'a> {
+    graph: &'a DegenGraph,
+    nquery: NQuery<'a>,
+    ladder_lower:usize,
+    ladder_upper:usize,
+    d: usize,
+}
+
+impl<'a> LadderAlgorithm<'a> {
+    pub fn new(graph: &'a DegenGraph) -> Self {
+        let d = *graph.left_degrees().values().max().unwrap() as usize;
+
+        let ladder_lower = 1;
+        let ladder_upper = 2*d+1;
+        let mut nquery = NQuery::new(graph);
+        Self{ graph, d, nquery, ladder_lower, ladder_upper}
+    }
+
+    pub fn run(&mut self) {
+        println!("Ladder index is at most {}", self.ladder_upper);
+
+        'outer: for k in 2..2*self.d+1 {
+            self.nquery.ensure_size(k);
+            for v in self.graph.vertices() {
+                let mut N = self.graph.left_neighbours(v);
+                N.push(*v);
+
+                for S in N.into_iter().combinations(k) {
+                    if self.nquery.contains_ladder(&S) {
+                        self.ladder_lower = k;
+                        println!("Ladder index is at least {}", self.ladder_lower);
+                        continue 'outer;
+                    }
+                }
+            }
+
+            self.ladder_upper = std::cmp::min(2*self.ladder_lower + 1, self.ladder_upper);
+            break;
+        }
+
+        println!("Ladder index is at least {}", self.ladder_lower);
+        println!("Ladder index is at most {}", self.ladder_upper);
+    }
+}

@@ -11,14 +11,16 @@ use crate::{setfunc::{SetFunc, SmallSetFunc}, vecset::{difference, union, inters
 pub struct NQuery<'a> {
     R:SetFunc,
     max_query_size: usize,
+    degeneracy: usize,
     graph:&'a DegenGraph
 }
 
 impl<'a> NQuery<'a> {
     pub fn new(graph:&'a DegenGraph) -> Self {  
         let mut R = SetFunc::default();
+        let degeneracy = *graph.left_degrees().values().max().unwrap() as usize;
 
-        NQuery { R, graph, max_query_size: 0 }
+        NQuery { R, graph, max_query_size: 0, degeneracy }
     }
 
     fn query_uncor(&self, X: &Vec<Vertex>, S: &Vec<Vertex>) -> i32 {
@@ -52,8 +54,29 @@ impl<'a> NQuery<'a> {
         res.into_iter().collect()
     }
 
-    pub fn ensure_size(&mut self, size:usize, query_candidates:&VertexSet) {
-        if size <= self.max_query_size {
+    pub fn ensure_size(&mut self, size:usize) {
+        if size <= self.max_query_size || self.max_query_size == self.degeneracy {
+            return;
+        }
+
+        println!("Recomputing R for query size {size}...");
+
+        for s in (self.max_query_size+1)..=size {
+            for u in self.graph.vertices() {
+                let mut N = self.graph.left_neighbours(u);
+                N.sort_unstable();
+    
+                for subset in N.into_iter().combinations(s) {
+                    self.R[&subset] += 1;
+                }
+            }
+        }
+
+        self.max_query_size = size;
+    }
+
+    pub fn ensure_size_restricted(&mut self, size:usize, query_candidates:&VertexSet) {
+        if size <= self.max_query_size || self.max_query_size == self.degeneracy {
             return;
         }
 
@@ -74,10 +97,10 @@ impl<'a> NQuery<'a> {
         self.max_query_size = size;
     }
 
-    pub fn is_shattered(&mut self, S: &[Vertex]) -> bool {
+    fn prepare(&self,  S: &[Vertex]) -> SmallSetFunc {
         let mut S:Vec<u32> = S.iter().cloned().collect();
         S.sort_unstable();
-        assert!(S.len() <= self.max_query_size);
+        assert!(S.len() <= self.max_query_size || self.max_query_size == self.degeneracy);
 
         let mut I = self.R.subfunc(&S); // Copies R into I on S
         I.mobius_trans_down();
@@ -87,7 +110,7 @@ impl<'a> NQuery<'a> {
         // Insert correct value for the empty set manually
         I[&vec![]] = self.graph.num_vertices() as i32 - res_sum;
 
-        // correction
+        // Left-neighbour correction
         let left_neighs = self.left_neighbour_set(&S);
 
         for v in left_neighs {   
@@ -106,11 +129,20 @@ impl<'a> NQuery<'a> {
             I[&N_left] -= 1;
             I[&N] += 1;
         }
-        
+        I
+    }
+
+    pub fn is_shattered(&self, S: &[Vertex]) -> bool {
+        let I = self.prepare(S);
         if I.count_nonzero() != 2_usize.pow(S.len() as u32) {
             return false
         }
         true
+    }
+
+    pub fn contains_ladder(&self, S: &[Vertex]) -> bool {
+        let I = self.prepare(S);
+        I.is_ladder()
     }
 
     pub fn degree_profile(&self, v:&Vertex) -> Vec<usize> {
@@ -138,7 +170,7 @@ mod  tests {
         let graph = DegenGraph::with_ordering(&graph, vec![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].iter());  
 
         let mut nquery = NQuery::new(&graph);
-        nquery.ensure_size(4, &graph.vertices().cloned().collect());
+        nquery.ensure_size_restricted(4, &graph.vertices().cloned().collect());
 
         let sh_set = vec![1, 2, 3, 4];
         let result = nquery.is_shattered(&sh_set);
@@ -151,7 +183,7 @@ mod  tests {
         let graph = DegenGraph::from_graph(&graph);  
 
         let mut nquery = NQuery::new(&graph);
-        nquery.ensure_size(4, &graph.vertices().cloned().collect());
+        nquery.ensure_size_restricted(4, &graph.vertices().cloned().collect());
 
         let unsh_set = vec![1, 2, 3, 16];
         let result = nquery.is_shattered(&unsh_set);
@@ -178,7 +210,7 @@ mod  tests {
 
             let D = DegenGraph::with_ordering(&G, order.iter());
             let mut nquery = NQuery::new(&D);
-            nquery.ensure_size(k as usize, &D.vertices().cloned().collect());
+            nquery.ensure_size_restricted(k as usize, &D.vertices().cloned().collect());
 
             let result = nquery.is_shattered(&(0..k).into_iter().collect_vec());
             assert_eq!(result, true);
@@ -186,7 +218,7 @@ mod  tests {
             order.shuffle(&mut rng);
             let D = DegenGraph::with_ordering(&G, order.iter());
             let mut nquery = NQuery::new(&D);
-            nquery.ensure_size(k as usize, &D.vertices().cloned().collect());
+            nquery.ensure_size_restricted(k as usize, &D.vertices().cloned().collect());
 
             let result = nquery.is_shattered(&(0..k).into_iter().collect_vec());
             assert_eq!(result, true);            
@@ -212,7 +244,7 @@ mod  tests {
         let order = vec![1,3,9,0,6,7,10,2,5,4,8];
         let D = DegenGraph::with_ordering(&G, order.iter());
         let mut nquery = NQuery::new(&D);
-        nquery.ensure_size(k as usize, &D.vertices().cloned().collect());
+        nquery.ensure_size_restricted(k as usize, &D.vertices().cloned().collect());
 
         let result = nquery.is_shattered(&(0..k).into_iter().collect_vec());
         assert_eq!(result, true);

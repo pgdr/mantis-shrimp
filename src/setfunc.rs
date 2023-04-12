@@ -168,6 +168,41 @@ impl SmallSetFunc {
     pub fn count_nonzero(&self) -> usize {
         self.values.iter().filter(|(_, value)| **value != 0).count()
     } 
+
+    pub fn is_ladder(&self) -> bool {
+        if self.size() == 0 {
+            return true;
+        }
+
+        if self.count_nonzero() < self.size() {
+            return false;
+        }
+
+        let bitset = (1 << self.size()) - 1;
+        debug_assert_eq!(bitset, self.convert_set(&self.universe));
+
+        self.is_ladder_rec(bitset, self.size())
+    }
+    
+    fn is_ladder_rec(&self, bitset:u128, size:usize) -> bool {
+        if size == 1 {
+            return self.values.get(&bitset).map_or(false, |count| count > &0);
+        }
+
+        if !self.values.contains_key(&bitset) {
+            return false
+        }
+
+        let mut it = bitset;
+        while it != 0 { // Iterates over all ones in `bitset`
+            let ix = u128::trailing_zeros(it);
+            it ^= 1 << ix;
+            if self.is_ladder_rec(bitset & !(1 << ix), size-1) {
+                return true
+            }
+        }   
+        return false
+    }
 }
 
 impl<'a, I> Index<I> for SmallSetFunc where I: IntoIterator<Item=&'a u32> {
@@ -216,7 +251,7 @@ impl Sub<SmallSetFunc> for SmallSetFunc {
         // bitset representations.         
 
         let mut res = SmallSetFunc::from_sorted_vec(self.universe.clone());
-        res.values = self.values.clone();
+        res.values = self.values;
         for (bitset, value) in rhs.values.iter() {
             *res.values.entry(*bitset).or_default() -= value;            
         }
@@ -344,4 +379,19 @@ mod tests {
         println!("-----------------------------");
     }
 
+    #[test]
+    fn test_ladder() {
+        let mut f:SmallSetFunc = SmallSetFunc::new(&vec![0,1,2,3]);
+
+        assert!(!f.is_ladder());
+        f[&vec![0,1,2,3]] = 1230;
+        f[&vec![  1,2,3]] = 24;
+        f[&vec![    2,3]] = 13;
+        f[&vec![      3]] = 1231;
+        assert!(f.is_ladder());
+        f[&vec![      3]] = 0;
+        assert!(!f.is_ladder());
+        f[&vec![      2]] = 1;
+        assert!(f.is_ladder());        
+    }
 }
