@@ -36,7 +36,8 @@ struct Args {
     #[clap(short, long)]
     help: bool,
 
-    #[clap(value_enum, default_value="vc", short, long)]
+    /// The statistic to compute
+    #[clap(value_enum)]
     statistic:StatisticArg,
 
     /// The network file
