@@ -305,17 +305,62 @@ impl<'a> LadderAlgorithm<'a> {
                 for S in N.into_iter().combinations(k) {
                     if self.nquery.contains_ladder(&S) {
                         self.ladder_lower = k;
-                        println!("Ladder index is at least {}", self.ladder_lower);
+                        println!("Ladder index is at least {}: {:?}", self.ladder_lower, S);
                         continue 'outer;
                     }
                 }
             }
-
+ 
             self.ladder_upper = std::cmp::min(2*self.ladder_lower + 1, self.ladder_upper);
             break;
         }
 
-        println!("Ladder index is at least {}", self.ladder_lower);
         println!("Ladder index is at most {}", self.ladder_upper);
+    }
+}
+
+
+pub struct CrownAlgorithm<'a> {
+    graph: &'a DegenGraph,
+    nquery: NQuery<'a>,
+    crown_lower:usize,
+    crown_upper:usize,
+    d: usize,
+}
+
+impl<'a> CrownAlgorithm<'a> {
+    pub fn new(graph: &'a DegenGraph) -> Self {
+        let d = *graph.left_degrees().values().max().unwrap() as usize;
+
+        let (n, m) = (graph.num_vertices(), graph.num_edges());
+        let crown_lower = if m == n*(n-1)/2 { 0 } else { 1 };
+        let crown_upper = d+1;
+        let mut nquery = NQuery::new(graph);
+        Self{ graph, d, nquery, crown_lower, crown_upper}
+    }
+
+    pub fn run(&mut self) {
+        println!("Crown size is at most {}", self.crown_upper);
+
+        'outer: for k in 2..2*self.d+1 {
+            self.nquery.ensure_size(k);
+            for v in self.graph.vertices() {
+                let mut N = self.graph.left_neighbours(v);
+                N.push(*v);
+
+                for S in N.into_iter().combinations(k) {
+                    if self.nquery.contains_crown(&S) {
+                        self.crown_lower = k;
+                        println!("Crown size is at least {}: {:?}", self.crown_lower, S);
+                        continue 'outer;
+                    }
+                }
+            }
+ 
+            self.crown_upper = std::cmp::min(self.crown_lower + 1, self.crown_upper);
+            break;
+        }
+
+        println!("Crown size is at most {}", self.crown_upper);
     }
 }

@@ -169,6 +169,25 @@ impl SmallSetFunc {
         self.values.iter().filter(|(_, value)| **value != 0).count()
     } 
 
+    pub fn is_crown(&self) -> bool {
+        if self.size() == 0 {
+            return true;
+        }
+
+        let universe = (1 << self.size()) - 1;        
+        let mut it = universe;
+        while it != 0 { // Iterates over all ones in `universe`
+            let ix = u128::trailing_zeros(it);
+            let singleton = 1 << ix;
+            it ^= singleton;
+            let bitset = universe & !singleton;
+            if self.is_zero(&bitset) {
+                return false
+            }
+        }
+        return true
+    }
+
     pub fn is_ladder(&self) -> bool {
         if self.size() == 0 {
             return true;
@@ -178,15 +197,15 @@ impl SmallSetFunc {
             return false;
         }
 
-        let bitset = (1 << self.size()) - 1;
-        debug_assert_eq!(bitset, self.convert_set(&self.universe));
+        let universe = (1 << self.size()) - 1;
+        debug_assert_eq!(universe, self.convert_set(&self.universe));
 
-        self.is_ladder_rec(bitset, self.size())
+        self.is_ladder_rec(universe, self.size())
     }
     
     fn is_ladder_rec(&self, bitset:u128, size:usize) -> bool {
         if size == 1 {
-            return self.values.get(&bitset).map_or(false, |count| count > &0);
+            return self.is_nonzero(&bitset);
         }
 
         if !self.values.contains_key(&bitset) {
@@ -203,6 +222,16 @@ impl SmallSetFunc {
         }   
         return false
     }
+
+    #[inline]
+    fn is_nonzero(&self, bitset:&u128) -> bool {
+        self.values.get(bitset).map_or(false, |count| count > &0)
+    }
+
+    #[inline]
+    fn is_zero(&self, bitset:&u128) -> bool {
+        self.values.get(bitset).map_or(true, |count| count == &0)
+    }    
 }
 
 impl<'a, I> Index<I> for SmallSetFunc where I: IntoIterator<Item=&'a u32> {

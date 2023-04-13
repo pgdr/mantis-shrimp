@@ -48,6 +48,7 @@ struct Args {
 enum StatisticArg {
     VC, 
     Ladder,
+    Crown,
 }
 
 fn main() -> Result<(), &'static str> {
@@ -84,6 +85,11 @@ fn main() -> Result<(), &'static str> {
             let mut alg = LadderAlgorithm::new(&graph);
             alg.run();   
         },
+        StatisticArg::Crown => {
+            println!("Approximating crown size");
+            let mut alg = CrownAlgorithm::new(&graph);
+            alg.run();               
+        }
     }
 
 

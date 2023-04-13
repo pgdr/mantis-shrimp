@@ -145,6 +145,11 @@ impl<'a> NQuery<'a> {
         I.is_ladder()
     }
 
+    pub fn contains_crown(&self, S: &[Vertex]) -> bool {
+        let I = self.prepare(S);
+        I.is_crown()
+    }    
+
     pub fn degree_profile(&self, v:&Vertex) -> Vec<usize> {
         let mut degrees = Vec::default();
         for u in self.graph.neighbours(v) {
