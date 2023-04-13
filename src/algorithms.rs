@@ -296,7 +296,9 @@ impl<'a> LadderAlgorithm<'a> {
     pub fn run(&mut self) {
         println!("Ladder index is at most {}", self.ladder_upper);
 
-        'outer: for k in 2..2*self.d+1 {
+        let start = self.ladder_lower+1;
+        let end = self.ladder_upper;
+        'outer: for k in start..=end {
             self.nquery.ensure_size(k);
             for v in self.graph.vertices() {
                 let mut N = self.graph.left_neighbours(v);
@@ -306,6 +308,9 @@ impl<'a> LadderAlgorithm<'a> {
                     if self.nquery.contains_ladder(&S) {
                         self.ladder_lower = k;
                         println!("Ladder index is at least {}: {:?}", self.ladder_lower, S);
+                        if self.ladder_lower == self.ladder_upper {
+                            break 'outer;
+                        }                        
                         continue 'outer;
                     }
                 }
@@ -342,7 +347,9 @@ impl<'a> CrownAlgorithm<'a> {
     pub fn run(&mut self) {
         println!("Crown size is at most {}", self.crown_upper);
 
-        'outer: for k in 2..2*self.d+1 {
+        let start = self.crown_lower+1;
+        let end = self.crown_upper;
+        'outer: for k in start..=end {
             self.nquery.ensure_size(k);
             for v in self.graph.vertices() {
                 let mut N = self.graph.left_neighbours(v);
@@ -350,8 +357,11 @@ impl<'a> CrownAlgorithm<'a> {
 
                 for S in N.into_iter().combinations(k) {
                     if self.nquery.contains_crown(&S) {
-                        self.crown_lower = k;
+                        self.crown_lower = k;                    
                         println!("Crown size is at least {}: {:?}", self.crown_lower, S);
+                        if self.crown_lower == self.crown_upper {
+                            break 'outer;
+                        }                            
                         continue 'outer;
                     }
                 }
@@ -362,5 +372,57 @@ impl<'a> CrownAlgorithm<'a> {
         }
 
         println!("Crown size is at most {}", self.crown_upper);
+    }
+}
+
+
+
+pub struct BicliqueAlgorithm<'a> {
+    graph: &'a DegenGraph,
+    nquery: NQuery<'a>,
+    biclique_lower:usize,
+    biclique_upper:usize,
+    d: usize,
+}
+
+impl<'a> BicliqueAlgorithm<'a> {
+    pub fn new(graph: &'a DegenGraph) -> Self {
+        let d = *graph.left_degrees().values().max().unwrap() as usize;
+
+        let m = graph.num_edges();
+        let biclique_lower = if m == 0 { 0 } else { 1 };
+        let biclique_upper = d;
+        let mut nquery = NQuery::new(graph);
+        Self{ graph, d, nquery, biclique_lower, biclique_upper}
+    }
+
+    pub fn run(&mut self) {
+        println!("Biclique size is at most {}", self.biclique_upper);
+
+        let start = self.biclique_lower+1;
+        let end = self.biclique_upper;
+        'outer: for k in start..=end {
+            self.nquery.ensure_size(k);
+            for v in self.graph.vertices() {
+                let mut N = self.graph.left_neighbours(v);
+                N.push(*v);
+
+                for S in N.into_iter().combinations(k) {
+                    if self.nquery.contains_biclique(&S) {
+                        self.biclique_lower = k;
+                        println!("Biclique size is at least {}: {:?}", self.biclique_lower, S);                        
+                        if self.biclique_lower == self.biclique_upper {
+                            break 'outer;
+                        }
+                        continue 'outer;
+                    }
+                }
+            }
+ 
+            self.biclique_upper = self.biclique_lower;
+            break;
+        }
+
+        println!("Biclique size is at most {}", self.biclique_upper);
     }
 }

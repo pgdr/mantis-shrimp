@@ -147,7 +147,12 @@ impl<'a> NQuery<'a> {
 
     pub fn contains_crown(&self, S: &[Vertex]) -> bool {
         let I = self.prepare(S);
-        I.is_crown()
+        I.contains_crown()
+    }
+
+    pub fn contains_biclique(&self, S: &[Vertex]) -> bool {
+        let I = self.prepare(S);
+        I.contains_biclique()
     }    
 
     pub fn degree_profile(&self, v:&Vertex) -> Vec<usize> {

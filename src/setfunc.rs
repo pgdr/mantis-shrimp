@@ -169,7 +169,7 @@ impl SmallSetFunc {
         self.values.iter().filter(|(_, value)| **value != 0).count()
     } 
 
-    pub fn is_crown(&self) -> bool {
+    pub fn contains_crown(&self) -> bool {
         if self.size() == 0 {
             return true;
         }
@@ -187,6 +187,15 @@ impl SmallSetFunc {
         }
         return true
     }
+
+    pub fn contains_biclique(&self) -> bool {
+        if self.size() == 0 {
+            return true;
+        }
+
+        let universe = (1 << self.size()) - 1;
+        self.is_at_least(&universe, &(self.size() as i32))
+    }    
 
     pub fn is_ladder(&self) -> bool {
         if self.size() == 0 {
@@ -226,6 +235,11 @@ impl SmallSetFunc {
     #[inline]
     fn is_nonzero(&self, bitset:&u128) -> bool {
         self.values.get(bitset).map_or(false, |count| count > &0)
+    }
+
+    #[inline]
+    fn is_at_least(&self, bitset:&u128, value:&i32) -> bool {
+        self.values.get(bitset).map_or(false, |count| count >= value)
     }
 
     #[inline]

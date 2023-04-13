@@ -49,6 +49,7 @@ enum StatisticArg {
     VC, 
     Ladder,
     Crown,
+    Biclique
 }
 
 fn main() -> Result<(), &'static str> {
@@ -89,7 +90,12 @@ fn main() -> Result<(), &'static str> {
             println!("Approximating crown size");
             let mut alg = CrownAlgorithm::new(&graph);
             alg.run();               
-        }
+        },
+        StatisticArg::Biclique => {
+            println!("Computing biclique size");
+            let mut alg = BicliqueAlgorithm::new(&graph);
+            alg.run();               
+        }        
     }
 
 
