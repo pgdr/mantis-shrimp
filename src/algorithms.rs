@@ -19,7 +19,7 @@ fn binom(n: usize, k: usize) -> usize {
 fn generate_degree_profile(k:usize) -> Vec<usize> {
     let mut res = Vec::default();
     for d in (1..=k).rev() {
-        for _ in 0..binom(k, d) {
+        for _ in 0..binom(k-1, d-1) {
             res.push(d);
         }
     }
