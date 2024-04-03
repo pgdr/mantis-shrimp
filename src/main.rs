@@ -1,31 +1,103 @@
 #![allow(non_snake_case)]
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(unused_imports)]
+
+mod io;
+mod nquery;
+mod algorithms;
+mod setfunc;
+mod vecset;
+mod skipcombs;
+
+// use std::backtrace::Backtrace;
+use std::collections::BTreeSet;
+use std::default;
+use io::load_graph;
+use nquery::*;
+use algorithms::*;
+
 use graphbench::editgraph::EditGraph;
 use graphbench::graph::*;
-use graphbench::io::*;
 
-use graphbench::ordgraph::*;
+use graphbench::degengraph::*;
 use itertools::*;
 
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 
-fn main() {
+use clap::{Parser, ValueEnum};
+use std::path::Path;
 
-    let mut graph = EditGraph::from_gzipped("Yeast.txt.gz").expect("File not found");
-    graph.remove_loops();
 
-    let graph = OrdGraph::by_degeneracy(&graph);
 
-    let mut R:FxHashMap<Vec<Vertex>, u32> = FxHashMap::default();
+#[derive(Parser, Debug)]
+#[clap(author, version="1.0", about, long_about = None)]
+struct Args {
+    #[clap(short, long)]
+    help: bool,
 
-    for u in graph.vertices() {
-        let N = graph.left_neighbours(u);
+    /// The statistic to compute
+    #[clap(value_enum)]
+    statistic:StatisticArg,
 
-        for subset in N.into_iter().powerset() {
-            R.entry(subset).and_modify(|c| *c += 1).or_insert(1);
+    /// The network file
+    file:String,    
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum StatisticArg {
+    VC, 
+    Ladder,
+    Crown,
+    Biclique
+}
+
+fn main() -> Result<(), &'static str> {
+    let args = Args::parse();
+    let filename = args.file;
+
+    // Load graph
+    let path = Path::new(&filename);
+    let mut graph = match load_graph(path) {
+        Ok(G) => G,
+        Err(msg) => {
+            println!("{msg}");
+            return Err("Parsing error");
         }
+    };
+
+    println!("Loaded graph with n={} and m={}", graph.num_vertices(), graph.num_edges());
+    
+    graph.remove_loops();
+    let graph = DegenGraph::from_graph(&graph);  
+
+    let d = *graph.left_degrees().values().max().unwrap() as usize;
+    let logd = (d as f32).log2();    
+    println!("Computed degeneracy ordering with d={} (log d = {:.2})", d, logd);
+
+    match args.statistic {
+        StatisticArg::VC => {
+            println!("Computing VC dimension");
+            let mut alg = VCAlgorithm::new(&graph);
+            alg.run();            
+        },
+        StatisticArg::Ladder => {
+            println!("Approximating ladder index");
+            let mut alg = LadderAlgorithm::new(&graph);
+            alg.run();   
+        },
+        StatisticArg::Crown => {
+            println!("Approximating crown size");
+            let mut alg = CrownAlgorithm::new(&graph);
+            alg.run();               
+        },
+        StatisticArg::Biclique => {
+            println!("Computing biclique size");
+            let mut alg = BicliqueAlgorithm::new(&graph);
+            alg.run();               
+        }        
     }
 
-    for (X, count) in R.iter() {
-        println!("{X:?} -> {count}");
-    }
+
+    Ok(())
 }
