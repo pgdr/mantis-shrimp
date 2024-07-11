@@ -75,6 +75,8 @@ impl<'a> NQuery<'a> {
         self.max_query_size = size;
     }
 
+    /// Preparse the internal neighbourhood-data structure for queries of size `size`
+    /// restricted to vertices in the set `query_candidates`.
     pub fn ensure_size_restricted(&mut self, size:usize, query_candidates:&VertexSet) {
         if size <= self.max_query_size || self.max_query_size == self.degeneracy {
             return;
@@ -97,20 +99,29 @@ impl<'a> NQuery<'a> {
         self.max_query_size = size;
     }
 
+    /// Preparse the vertex set S for neighbourhood-queries, e.g. for each subset X of S
+    /// we obtain the number of vertices in G which have all of X as neighbours an none of S\X.
     fn prepare(&self,  S: &[Vertex]) -> SmallSetFunc {
         let mut S:Vec<u32> = S.iter().cloned().collect();
         S.sort_unstable();
         assert!(S.len() <= self.max_query_size || self.max_query_size == self.degeneracy);
 
+        // Copies R into I on S. At this point, I[X] with X nonempty tells us how many vertices in G exist which
+        // a) Are to the right of X in the ordering
+        // b) Have all of X as neighbours (but might also have further neighbours in S)
         let mut I = self.R.subfunc(&S); // Copies R into I on S
+
+        // Compute downward Mobius inveres of I. At this point, I[X] with X nonempty tells us how many vertices in G exist whicch
+        // a) Are to the right of X in the ordering
+        // b) Have all of X as neighbours and none of S/X
         I.mobius_trans_down();
 
+        // We now insert the correct value for the empty set manually. Note that this
+        // has to happend before we apply the 'left correction'.
         let res_sum:i32 = I.values_nonzero().sum();
-
-        // Insert correct value for the empty set manually
         I[&vec![]] = self.graph.num_vertices() as i32 - res_sum;
 
-        // Left-neighbour correction
+        // Apply left-neighbour correction
         let left_neighs = self.left_neighbour_set(&S);
 
         for v in left_neighs {   
@@ -129,6 +140,7 @@ impl<'a> NQuery<'a> {
             I[&N_left] -= 1;
             I[&N] += 1;
         }
+        assert_eq!(I.values_nonzero().sum(), self.graph.num_vertices() as i32);
         I
     }
 
