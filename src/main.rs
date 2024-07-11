@@ -19,6 +19,7 @@ use algorithms::*;
 
 use graphbench::editgraph::EditGraph;
 use graphbench::graph::*;
+use graphbench::io::load_vertex_set;
 
 use graphbench::degengraph::*;
 use itertools::*;
@@ -42,6 +43,9 @@ struct Args {
 
     /// The network file
     file:String,    
+
+    ///  (VC only) restrict search of shattered set to these vertices
+    shattered_candidates:Option<String>,
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -79,6 +83,20 @@ fn main() -> Result<(), &'static str> {
         StatisticArg::VC => {
             println!("Computing VC dimension");
             let mut alg = VCAlgorithm::new(&graph);
+
+            if let Some(filename) = args.shattered_candidates {
+                let cand_set = match load_vertex_set(&filename) {
+                    Ok(cand_set) => cand_set,
+                    Err(error) => {
+                        println!("{:?}", error);
+                        return Err("Could not parse candidate vertex set");
+                    }
+                };
+                let cand_size = cand_set.len();
+                println!("Restricting VC search to {cand_size} vertices contained in `{filename}`");
+                alg.set_shatter_candidates(&cand_set);
+            }
+
             alg.run();            
         },
         StatisticArg::Ladder => {

@@ -111,7 +111,7 @@ impl<'a> NQuery<'a> {
         // b) Have all of X as neighbours (but might also have further neighbours in S)
         let mut I = self.R.subfunc(&S); // Copies R into I on S
 
-        // Compute downward Mobius inveres of I. At this point, I[X] with X nonempty tells us how many vertices in G exist whicch
+        // Compute downward Mobius inveres of I. At this point, I[X] with X nonempty tells us how many vertices in G exist which
         // a) Are to the right of X in the ordering
         // b) Have all of X as neighbours and none of S/X
         I.mobius_trans_down();
@@ -121,7 +121,8 @@ impl<'a> NQuery<'a> {
         let res_sum:i32 = I.values_nonzero().sum();
         I[&vec![]] = self.graph.num_vertices() as i32 - res_sum;
 
-        // Apply left-neighbour correction
+        // Apply left-neighbour correction. Afterwards, I[X] tells us how many vertices in G exist
+        // which have all of X as neigbhours and none of S/X
         let left_neighs = self.left_neighbour_set(&S);
 
         for v in left_neighs {   
@@ -140,7 +141,7 @@ impl<'a> NQuery<'a> {
             I[&N_left] -= 1;
             I[&N] += 1;
         }
-        assert_eq!(I.values_nonzero().sum(), self.graph.num_vertices() as i32);
+        assert_eq!(I.values_nonzero().sum::<i32>(), self.graph.num_vertices() as i32);
         I
     }
 

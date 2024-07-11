@@ -68,6 +68,10 @@ impl<'a> VCAlgorithm<'a> {
         VCAlgorithm{ graph, d, logd, shatter_candidates, cover_candidates, nquery, local_lower_bound, local_upper_bound, vc_dim}
     }
 
+    pub fn set_shatter_candidates(&mut self, candidates:&VertexSet) {
+        self.shatter_candidates = candidates.iter().filter(|x| self.graph.contains(x)).cloned().collect();
+    }
+
     pub fn run(&mut self) {
         let mut improved = true;
         let mut cover_size = 1;
