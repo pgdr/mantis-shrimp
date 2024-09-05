@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 use graphbench::{graph::*, iterators::LeftNeighIterable};
 use graphbench::degengraph::DegenGraph;
@@ -7,6 +8,8 @@ use crate::nquery::NQuery;
 
 use itertools::*;
 use crate::skipcombs::{SkippableCombinations, SkippableCombinationsIter};
+
+use crate::{setfunc::{SetFunc, SmallSetFunc}, vecset::{difference, union, intersection}};
 
 fn binom(n: usize, k: usize) -> usize {
     let mut res = 1;
@@ -428,5 +431,78 @@ impl<'a> BicliqueAlgorithm<'a> {
         }
 
         println!("Biclique size is at most {}", self.biclique_upper);
+    }
+}
+
+
+
+
+
+pub struct CClosureAlgorithm<'a> {
+    graph: &'a DegenGraph,
+    nquery: NQuery<'a>,
+    cclosure_lower:usize,
+    cclosure_upper:usize,
+    d: usize,
+}
+
+impl<'a> CClosureAlgorithm<'a> {
+    pub fn new(graph: &'a DegenGraph) -> Self {
+        let d = *graph.left_degrees().values().max().unwrap() as usize;
+
+        let m = graph.num_edges();
+        let cclosure_lower = if m == 0 { 0 } else { 1 };
+        let cclosure_upper = d;
+        let mut nquery = NQuery::new(graph);
+        Self{ graph, d, nquery, cclosure_lower, cclosure_upper}
+    }
+
+    pub fn run(&mut self) {
+        println!("CClosure size is at most {}", self.cclosure_upper);
+
+        let mut C : usize = 0;  // the c-closure: TODO should be -2
+
+        // CASE 1: u < v < x
+        for x in self.graph.vertices() {
+            for u in self.graph.left_neighbours(&x) {      // TODO u,v should be N(x) choose 2
+                for v in self.graph.left_neighbours(&x) {
+                    if u == v {
+                        continue
+                    }
+                    if self.graph.degree(&u) < C as u32 {
+                        continue
+                    }
+                    if self.graph.degree(&v) < C as u32{
+                        continue
+                    }
+                    let Nu: Vec<u32> = self.graph.neighbours(&u).into_iter().copied().sorted_unstable().collect();
+                    let Nv: Vec<u32> = self.graph.neighbours(&v).into_iter().copied().sorted_unstable().collect();
+
+                    let Nuv = intersection(&Nu[..], &Nv[..]);
+                    let luv = Nuv.len();
+                    if luv > C {
+                        C = luv
+                    }
+                }
+            }
+            if C > self.cclosure_lower {
+                self.cclosure_lower = C
+            }
+        }
+
+        // CASE 2: CASE 2: u < x < v
+        // Note, only when c < |Left(v)|
+        for v in self.graph.vertices() {
+            // TBI
+        }
+
+        // CASE 3: x < u < v
+        // Note: only when c < min(|Left(u)|, |Left(v)|)
+        for v in self.graph.vertices() {
+            // TBI
+        }
+
+
+        println!("CClosure size is at most {}", self.cclosure_upper);
     }
 }

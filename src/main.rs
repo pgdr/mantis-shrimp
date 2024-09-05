@@ -50,10 +50,11 @@ struct Args {
 
 #[derive(Clone, Debug, ValueEnum)]
 enum StatisticArg {
-    VC, 
+    VC,
     Ladder,
     Crown,
-    Biclique
+    Biclique,
+    CClosure
 }
 
 fn main() -> Result<(), &'static str> {
@@ -112,8 +113,14 @@ fn main() -> Result<(), &'static str> {
         StatisticArg::Biclique => {
             println!("Computing biclique size");
             let mut alg = BicliqueAlgorithm::new(&graph);
-            alg.run();               
-        }        
+            alg.run();
+        }
+        StatisticArg::CClosure => {
+            println!("Computing c-closure");
+            let mut alg = CClosureAlgorithm::new(&graph);
+            alg.run();
+        }
+
     }
 
 
