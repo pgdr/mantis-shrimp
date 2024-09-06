@@ -517,9 +517,31 @@ impl<'a> CClosureAlgorithm<'a> {
 
         // CASE 3: x < u < v
         // Note: only when c < min(|Left(u)|, |Left(v)|)
+
         for v in self.graph.vertices() {
-            // TBI
+            if L(&v).len() <= C {
+                continue
+            }
+            for u in self.graph.vertices() { // TODO should be u,v = V choose 2
+                if v == u {
+                    continue
+                }
+                if self.graph.adjacent(&u, &v) {
+                    continue
+                }
+                if L(&u).len() <= C {
+                    continue
+                }
+                let Lu: Vec<u32> = L(&u).into_iter().sorted_unstable().collect(); // TODO pull out!
+                let Lv: Vec<u32> = L(&v).into_iter().sorted_unstable().collect();
+                let Nuv = intersection(&Lu[..], &Lv[..]);
+                if Nuv.len() > C {
+                    C = Nuv.len()
+                }
+            }
         }
+        self.cclosure_lower = C;
+        self.cclosure_upper = C;
 
         println!("CClosure size is at most {}", self.cclosure_upper);
     }
