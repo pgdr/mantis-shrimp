@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 use graphbench::{graph::*, iterators::LeftNeighIterable};
@@ -464,6 +465,15 @@ impl<'a> CClosureAlgorithm<'a> {
         let N = |u: &Vertex| self.graph.neighbours(u);
         let L = |u: &Vertex| self.graph.left_neighbours(u);
 
+        let mut MapN: HashMap<u32, Vec<u32>> = HashMap::new();
+        let mut MapL: HashMap<u32, Vec<u32>> = HashMap::new();
+        for v in self.graph.vertices() {
+            MapN.insert(*v, N(&v).into_iter().copied().sorted_unstable().collect());
+            MapL.insert(*v, L(&v).into_iter().sorted_unstable().collect());
+        }
+
+
+
         // CASE 1: u < v < x
         for x in self.graph.vertices() {
             for u in L(&x) {      // TODO u,v should be N(x) choose 2
@@ -480,15 +490,12 @@ impl<'a> CClosureAlgorithm<'a> {
                     if self.graph.degree(&v) < C as u32{
                         continue
                     }
-                    let Nu: Vec<u32> = N(&u).into_iter().copied().sorted_unstable().collect(); // TODO pull out!
-                    let Nv: Vec<u32> = N(&v).into_iter().copied().sorted_unstable().collect();
-
-                    let Nuv = intersection(&Nu[..], &Nv[..]);
+                    let Nuv = intersection(&MapN[&u][..], &MapN[&v][..]);
                     let luv = Nuv.len();
                     if luv > C {
                         C = luv;
-                        println!("CClosure N {:?}", Nuv);
-                        println!("  {} ϵ N({}) ∩ N({})", x, u, v);
+                        //println!("CClosure N {:?}", Nuv);
+                        //println!("  {} ϵ N({}) ∩ N({})", x, u, v);
                     }
                 }
             }
@@ -514,9 +521,7 @@ impl<'a> CClosureAlgorithm<'a> {
                     if self.graph.adjacent(&u, &v) {
                         continue
                     }
-                    let Nu: Vec<u32> = N(&u).into_iter().copied().sorted_unstable().collect(); // TODO pull out!
-                    let Lv: Vec<u32> = L(&v).into_iter().sorted_unstable().collect();
-                    let Nuv = intersection(&Nu[..], &Lv[..]);
+                    let Nuv = intersection(&MapN[&u][..], &MapL[&v][..]);
                     if Nuv.len() > C {
                         C = Nuv.len()
                     }
@@ -541,9 +546,7 @@ impl<'a> CClosureAlgorithm<'a> {
                 if L(&u).len() <= C {
                     continue
                 }
-                let Lu: Vec<u32> = L(&u).into_iter().sorted_unstable().collect(); // TODO pull out!
-                let Lv: Vec<u32> = L(&v).into_iter().sorted_unstable().collect();
-                let Nuv = intersection(&Lu[..], &Lv[..]);
+                let Nuv = intersection(&MapL[&u][..], &MapL[&v][..]);
                 if Nuv.len() > C {
                     C = Nuv.len()
                 }
