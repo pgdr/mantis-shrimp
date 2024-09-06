@@ -458,7 +458,6 @@ impl<'a> CClosureAlgorithm<'a> {
     }
 
     pub fn run(&mut self) {
-        println!("CClosure size is at most {}", self.cclosure_upper);
 
         let mut C : usize = 0;  // the c-closure: TODO should be -2
 
@@ -472,19 +471,24 @@ impl<'a> CClosureAlgorithm<'a> {
                     if u == v {
                         continue
                     }
+                    if self.graph.adjacent(&u, &v) {
+                        continue
+                    }
                     if self.graph.degree(&u) < C as u32 {
                         continue
                     }
                     if self.graph.degree(&v) < C as u32{
                         continue
                     }
-                    let Nu: Vec<u32> = N(&u).into_iter().copied().sorted_unstable().collect();
+                    let Nu: Vec<u32> = N(&u).into_iter().copied().sorted_unstable().collect(); // TODO pull out!
                     let Nv: Vec<u32> = N(&v).into_iter().copied().sorted_unstable().collect();
 
                     let Nuv = intersection(&Nu[..], &Nv[..]);
                     let luv = Nuv.len();
                     if luv > C {
-                        C = luv
+                        C = luv;
+                        println!("CClosure N {:?}", Nuv);
+                        println!("  {} ϵ N({}) ∩ N({})", x, u, v);
                     }
                 }
             }
@@ -493,7 +497,12 @@ impl<'a> CClosureAlgorithm<'a> {
                 self.cclosure_lower = C
             }
         }
-
+        if C >= self.d || (C == 1 && self.d == 2) {
+            self.cclosure_lower = C + 1;
+            self.cclosure_upper = C + 1;
+            println!("CClosure size is {} (<{})", C, self.cclosure_upper);
+            return
+        }
         // CASE 2: CASE 2: u < x < v
         // Note, only when c < |Left(v)|
         for v in self.graph.vertices() {
@@ -540,9 +549,9 @@ impl<'a> CClosureAlgorithm<'a> {
                 }
             }
         }
-        self.cclosure_lower = C;
-        self.cclosure_upper = C;
+        self.cclosure_lower = C+1;
+        self.cclosure_upper = C+1;
 
-        println!("CClosure size is at most {}", self.cclosure_upper);
+        println!("CClosure size is {} (<{})", C, self.cclosure_upper);
     }
 }
