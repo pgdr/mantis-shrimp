@@ -462,10 +462,13 @@ impl<'a> CClosureAlgorithm<'a> {
 
         let mut C : usize = 0;  // the c-closure: TODO should be -2
 
+        let N = |u: &Vertex| self.graph.neighbours(u);
+        let L = |u: &Vertex| self.graph.left_neighbours(u);
+
         // CASE 1: u < v < x
         for x in self.graph.vertices() {
-            for u in self.graph.left_neighbours(&x) {      // TODO u,v should be N(x) choose 2
-                for v in self.graph.left_neighbours(&x) {
+            for u in L(&x) {      // TODO u,v should be N(x) choose 2
+                for v in L(&x) {
                     if u == v {
                         continue
                     }
@@ -475,8 +478,8 @@ impl<'a> CClosureAlgorithm<'a> {
                     if self.graph.degree(&v) < C as u32{
                         continue
                     }
-                    let Nu: Vec<u32> = self.graph.neighbours(&u).into_iter().copied().sorted_unstable().collect();
-                    let Nv: Vec<u32> = self.graph.neighbours(&v).into_iter().copied().sorted_unstable().collect();
+                    let Nu: Vec<u32> = N(&u).into_iter().copied().sorted_unstable().collect();
+                    let Nv: Vec<u32> = N(&v).into_iter().copied().sorted_unstable().collect();
 
                     let Nuv = intersection(&Nu[..], &Nv[..]);
                     let luv = Nuv.len();
@@ -485,6 +488,7 @@ impl<'a> CClosureAlgorithm<'a> {
                     }
                 }
             }
+
             if C > self.cclosure_lower {
                 self.cclosure_lower = C
             }
@@ -493,7 +497,22 @@ impl<'a> CClosureAlgorithm<'a> {
         // CASE 2: CASE 2: u < x < v
         // Note, only when c < |Left(v)|
         for v in self.graph.vertices() {
-            // TBI
+            if C > L(&v).len() {
+                continue
+            }
+            for x in L(&v) {
+                for u in L(&x) {
+                    if self.graph.adjacent(&u, &v) {
+                        continue
+                    }
+                    let Nu: Vec<u32> = N(&u).into_iter().copied().sorted_unstable().collect(); // TODO pull out!
+                    let Lv: Vec<u32> = L(&v).into_iter().sorted_unstable().collect();
+                    let Nuv = intersection(&Nu[..], &Lv[..]);
+                    if Nuv.len() > C {
+                        C = Nuv.len()
+                    }
+                }
+            }
         }
 
         // CASE 3: x < u < v
@@ -501,7 +520,6 @@ impl<'a> CClosureAlgorithm<'a> {
         for v in self.graph.vertices() {
             // TBI
         }
-
 
         println!("CClosure size is at most {}", self.cclosure_upper);
     }
