@@ -1,9 +1,9 @@
-pub fn union(A:&[u32], B:&[u32]) -> Vec<u32> {
+pub fn union(A: &[u32], B: &[u32]) -> Vec<u32> {
     let mut res = Vec::default();
     let mut ia = 0;
     let mut ib = 0;
     while ia < A.len() && ib < B.len() {
-        let (a,b) = (A[ia], B[ib]);
+        let (a, b) = (A[ia], B[ib]);
         if a == b {
             res.push(a);
             ia += 1;
@@ -11,7 +11,8 @@ pub fn union(A:&[u32], B:&[u32]) -> Vec<u32> {
         } else if a < b {
             res.push(a);
             ia += 1;
-        } else { // a > b
+        } else {
+            // a > b
             res.push(b);
             ib += 1;
         }
@@ -26,35 +27,36 @@ pub fn union(A:&[u32], B:&[u32]) -> Vec<u32> {
     res
 }
 
-pub fn intersection(A:&[u32], B:&[u32]) -> Vec<u32> {
+pub fn intersection(A: &[u32], B: &[u32]) -> Vec<u32> {
     let mut res = Vec::default();
     let mut ia = 0;
     let mut ib = 0;
     while ia < A.len() && ib < B.len() {
-        let (a,b) = (A[ia], B[ib]);
+        let (a, b) = (A[ia], B[ib]);
         if a == b {
             res.push(a);
             ia += 1;
             ib += 1;
         } else if a < b {
             ia += 1;
-        } else { // a > b
+        } else {
+            // a > b
             ib += 1;
         }
     }
 
-    // Handle remainders: 
+    // Handle remainders:
     // Cannot be in intersection.
 
     res
 }
 
-pub fn difference(A:&[u32], B:&[u32]) -> Vec<u32> {
+pub fn difference(A: &[u32], B: &[u32]) -> Vec<u32> {
     let mut res = Vec::default();
     let mut ia = 0;
     let mut ib = 0;
     while ia < A.len() && ib < B.len() {
-        let (a,b) = (A[ia], B[ib]);
+        let (a, b) = (A[ia], B[ib]);
         if a == b {
             // We know that a is not in the result
             ia += 1;
@@ -63,7 +65,8 @@ pub fn difference(A:&[u32], B:&[u32]) -> Vec<u32> {
             // We can be sure that a is not in B
             res.push(a);
             ia += 1;
-        } else { // a > b
+        } else {
+            // a > b
             ib += 1;
         }
     }
@@ -84,7 +87,7 @@ mod tests {
     use super::*;
     use rand::prelude::*;
 
-    fn rand_set(rng:&mut ThreadRng) -> (Vec<u32>, BTreeSet<u32>) {
+    fn rand_set(rng: &mut ThreadRng) -> (Vec<u32>, BTreeSet<u32>) {
         let mut res = Vec::default();
         for _ in 0..50 {
             res.push(rng.gen_range(0..100));
@@ -104,7 +107,7 @@ mod tests {
             let (B, B_set) = rand_set(&mut rng);
 
             let res = union(&A, &B);
-            let res_set:Vec<u32> = A_set.union(&B_set).cloned().collect();
+            let res_set: Vec<u32> = A_set.union(&B_set).cloned().collect();
             assert_eq!(res, res_set);
 
             assert_eq!(res, union(&B, &A));
@@ -121,7 +124,7 @@ mod tests {
             let (B, B_set) = rand_set(&mut rng);
 
             let res = intersection(&A, &B);
-            let res_set:Vec<u32> = A_set.intersection(&B_set).cloned().collect();
+            let res_set: Vec<u32> = A_set.intersection(&B_set).cloned().collect();
             assert_eq!(res, res_set);
             assert_eq!(res, intersection(&B, &A));
             assert_eq!(intersection(&A, &vec![]), vec![]);
@@ -137,11 +140,11 @@ mod tests {
             let (B, B_set) = rand_set(&mut rng);
 
             let res = difference(&A, &B);
-            let res_set:Vec<u32> = A_set.difference(&B_set).cloned().collect();
+            let res_set: Vec<u32> = A_set.difference(&B_set).cloned().collect();
             assert_eq!(res, res_set);
             assert_eq!(difference(&A, &vec![]), A);
             assert_eq!(difference(&vec![], &A), vec![]);
             assert_eq!(difference(&A, &A), vec![]);
         }
-    }    
+    }
 }
